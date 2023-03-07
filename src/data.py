@@ -226,3 +226,24 @@ def get_same_source_negs(num_nodes, num_negs_per_pos, pos_edge):
     dst_neg = torch.randint(0, num_nodes, (1, pos_edge.size(1) * num_negs_per_pos), dtype=torch.long)
     src_neg = pos_edge[0].repeat_interleave(num_negs_per_pos)
     return torch.cat([src_neg.unsqueeze(0), dst_neg], dim=0)
+
+
+def get_pos_neg_edges(data, sample_frac=1):
+    """
+    extract the positive and negative supervision edges (as opposed to message passing edges) from data that has been transformed by RandomLinkSplit
+    :param data: A train, val or test split returned by RandomLinkSplit
+    :return: positive edge_index, negative edge_index.
+    """
+    device = data.edge_index.device
+    edge_index = data['edge_label_index'].to(device)
+    labels = data['edge_label'].to(device)
+    pos_edges = edge_index[:, labels == 1].t()
+    neg_edges = edge_index[:, labels == 0].t()
+    if sample_frac != 1:
+        n_pos = pos_edges.shape[0]
+        np.random.seed(123)
+        perm = np.random.permutation(n_pos)
+        perm = perm[:int(sample_frac * n_pos)]
+        pos_edges = pos_edges[perm, :]
+        neg_edges = neg_edges[perm, :]
+    return pos_edges.to(device), neg_edges.to(device)
