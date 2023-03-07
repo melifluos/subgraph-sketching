@@ -18,7 +18,7 @@ OPT = {'sample_size': None, 'dataset_name': 'Cora', 'num_hops': 2, 'max_dist': 1
        'val_citation_sample_size': None, 'wandb': False, 'batch_size': 32, 'num_workers': 1,
        'cache_train_structure_features': False, 'cache_val_structure_features': False,
        'cache_test_structure_features': False, 'lr': 0.1, 'weight_decay': 0, 'train_samples': 1,
-       'citation_sample_size': None, 'eval_batch_size': 1000, 'propagate_embeddings': False, 'num_negs': 1,
+       'citation_sample_size': None, 'eval_batch_size': 100, 'propagate_embeddings': False, 'num_negs': 1,
        'sign_dropout': 0.5, 'sign_k': 2, 'use_struct_feature': True, 'max_hash_hops': 2, 'hll_p': 8,
        'minhash_num_perm': 128, 'floor_sf': False, 'year': 0, 'feature_prop': 'gcn', 'train_node_embeddings': False,
        'train_samples': inf, 'val_samples': inf, 'test_samples': inf}
