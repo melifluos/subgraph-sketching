@@ -7,14 +7,18 @@ Code for Graph Neural Networks for Link Prediction with Subgraph Sketching https
 ## Running experiments
 
 ### Requirements
-Dependencies (with python >= 3.7):
+Dependencies (with python >= 3.10):
 Main dependencies are
-torch==1.8.1
+
+pytorch==1.13
+pyg==2.2
 
 Commands to install all the dependencies in a new conda environment
 ```
 conda create --name ss python=3.7
 conda activate ss
+conda install pytorch torchvision torchaudio pytorch-cuda=11.6 -c pytorch -c nvidia
+conda install pyg -c pyg
 ```
 
 
