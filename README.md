@@ -11,14 +11,18 @@ Dependencies (with python >= 3.10):
 Main dependencies are
 
 pytorch==1.13
+
 pyg==2.2
 
-Commands to install all the dependencies in a new conda environment
+fast-pagerank==0.0.4 (only used to run PPR baselines)
+
+Example commands to install the dependencies in a new conda environment
 ```
-conda create --name ss python=3.7
+conda create --name ss python=3.10
 conda activate ss
 conda install pytorch torchvision torchaudio pytorch-cuda=11.6 -c pytorch -c nvidia
 conda install pyg -c pyg
+pip install fast-pagerank
 ```
 
 
