@@ -11,6 +11,7 @@ Dependencies (with python >= 3.10):
 Main dependencies are
 
 pytorch==1.13
+
 pyg==2.2
 
 Commands to install all the dependencies in a new conda environment
