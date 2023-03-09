@@ -70,3 +70,13 @@ class ELPHTests(unittest.TestCase):
         x, hashes, cards, emb = gnn(self.x, self.edge_index)
         self.assertTrue(emb.shape == (self.n_nodes, (1 + gnn.num_layers) * args.hidden_channels))
         self.assertTrue(x.shape == (self.n_nodes, (1 + gnn.num_layers) * args.hidden_channels))
+
+    def test_model_forward(self):
+        n_links = 10
+        num_features = self.x.shape[1]
+        gnn = ELPHGNN(self.args, num_features)
+        x, hashes, cards, _ = gnn(self.x, self.edge_index)
+        links = torch.randint(self.n_nodes, (n_links, 2))
+        sf = gnn.elph_hashes.get_subgraph_features(links, hashes, cards)
+        out = gnn.predictor(sf, x[links])
+        self.assertTrue(len(out) == n_links)
