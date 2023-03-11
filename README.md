@@ -18,7 +18,11 @@ wandb==0.13.9 (for logging and tuning)
 
 datasketch==1.5.9
 
-fast-pagerank==0.0.4 (to run PPR baselines)
+fast-pagerank==0.0.4 (only to run PPR baselines)
+
+scipy==1.10.0
+
+networkx==2.8.4 (only to generate random graphs for testing)
 
 Example commands to install the dependencies in a new conda environment
 ```
@@ -26,6 +30,8 @@ conda create --name ss python=3.10
 conda activate ss
 conda install pytorch torchvision torchaudio pytorch-cuda=11.6 -c pytorch -c nvidia
 conda install pyg -c pyg
+conda install -c anaconda networkx
+conda install -c anaconda scipy
 pip install fast-pagerank
 pip install wandb
 pip install datasketch
