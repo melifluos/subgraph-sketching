@@ -21,6 +21,14 @@ DEFAULT_DIC = {'sample_size': None, 'dataset_name': 'Cora', 'num_hops': 2, 'max_
                'citation_sample_size': None, 'eval_batch_size': 1000, 'bulk_train': False, 'num_negs': 1}
 
 
+def print_model_params(model):
+    print(model)
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            print(name)
+            print(param.data.shape)
+
+
 def neighbors(fringe, A, outgoing=True):
     """
     Retrieve neighbours of nodes within the fringe
