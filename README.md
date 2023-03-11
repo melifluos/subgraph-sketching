@@ -14,9 +14,11 @@ pytorch==1.13
 
 pyg==2.2
 
-wandb==0.13.9
+wandb==0.13.9 (for logging and tuning)
 
-fast-pagerank==0.0.4 (only used to run PPR baselines)
+datasketch==1.5.9
+
+fast-pagerank==0.0.4 (to run PPR baselines)
 
 Example commands to install the dependencies in a new conda environment
 ```
@@ -26,6 +28,7 @@ conda install pytorch torchvision torchaudio pytorch-cuda=11.6 -c pytorch -c nvi
 conda install pyg -c pyg
 pip install fast-pagerank
 pip install wandb
+pip install datasketch
 ```
 
 if you are unfamiliar with wandb, quickstart instructions are
