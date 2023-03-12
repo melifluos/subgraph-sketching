@@ -2,17 +2,15 @@
 hashed based data sketching for graphs. Implemented in pytorch, but based on the datasketch library
 """
 import sys
-import copy
 from time import time
 import logging
 
 import torch
-from torch import tensor, float, zeros
+from torch import float
 from tqdm import tqdm
 import numpy as np
 from pandas.util import hash_array
 from datasketch import MinHash, HyperLogLogPlusPlus, hyperloglog_const
-from multiprocessing import Pool
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import add_self_loops
 

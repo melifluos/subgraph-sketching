@@ -35,56 +35,56 @@ class SEALDatasetTests(unittest.TestCase):
         self.iso_num_nodes = 5
         self.args = OPT
 
-        def test_k_hop_subgraph(self):
-            num_hops = ratio_per_hop = 1
-            directed = False
-            max_nodes_per_hop = None
-            if directed:
-                A_csc = self.A.tocsc()
-            else:
-                A_csc = None
-            x = torch.rand(self.num_nodes, 2)
-            src, dst = 0, 1
-            nodes, subgraph, dists, node_features, y = k_hop_subgraph(src, dst, num_hops, self.A, ratio_per_hop,
-                                                                      max_nodes_per_hop, node_features=x, y=1,
-                                                                      directed=directed, A_csc=A_csc)
-            data = construct_pyg_graph(nodes, subgraph, dists, node_features, y, node_label='drnl')
-            self.assertTrue(data.edge_index.shape[1] == 4)  # 3 edges minus the 0-1 edge and undirected
-            src, dst = 1, 2
-            nodes, subgraph, dists, node_features, y = k_hop_subgraph(src, dst, num_hops, self.A, ratio_per_hop,
-                                                                      max_nodes_per_hop, node_features=x, y=1,
-                                                                      directed=directed, A_csc=A_csc)
-            data = construct_pyg_graph(nodes, subgraph, dists, node_features, y, node_label='drnl')
+    def test_k_hop_subgraph(self):
+        num_hops = ratio_per_hop = 1
+        directed = False
+        max_nodes_per_hop = None
+        if directed:
+            A_csc = self.A.tocsc()
+        else:
+            A_csc = None
+        x = torch.rand(self.num_nodes, 2)
+        src, dst = 0, 1
+        nodes, subgraph, dists, node_features, y = k_hop_subgraph(src, dst, num_hops, self.A, ratio_per_hop,
+                                                                  max_nodes_per_hop, node_features=x, y=1,
+                                                                  directed=directed, A_csc=A_csc)
+        data = construct_pyg_graph(nodes, subgraph, dists, node_features, y, node_label='drnl')
+        self.assertTrue(data.edge_index.shape[1] == 4)  # 3 edges minus the 0-1 edge and undirected
+        src, dst = 1, 2
+        nodes, subgraph, dists, node_features, y = k_hop_subgraph(src, dst, num_hops, self.A, ratio_per_hop,
+                                                                  max_nodes_per_hop, node_features=x, y=1,
+                                                                  directed=directed, A_csc=A_csc)
+        data = construct_pyg_graph(nodes, subgraph, dists, node_features, y, node_label='drnl')
 
-            self.assertTrue(data.edge_index.shape[1] == 6)  # 4 edges minus 1->2 and 2->1, but undirected
-            src, dst = 2, 1
-            nodes, subgraph, dists, node_features, y = k_hop_subgraph(src, dst, num_hops, self.A, ratio_per_hop,
-                                                                      max_nodes_per_hop, node_features=x, y=1,
-                                                                      directed=directed, A_csc=A_csc)
-            data = construct_pyg_graph(nodes, subgraph, dists, node_features, y, node_label='drnl')
-            self.assertTrue(data.edge_index.shape[1] == 6)  # 4 edges minus 1->2 and 2->1
+        self.assertTrue(data.edge_index.shape[1] == 6)  # 4 edges minus 1->2 and 2->1, but undirected
+        src, dst = 2, 1
+        nodes, subgraph, dists, node_features, y = k_hop_subgraph(src, dst, num_hops, self.A, ratio_per_hop,
+                                                                  max_nodes_per_hop, node_features=x, y=1,
+                                                                  directed=directed, A_csc=A_csc)
+        data = construct_pyg_graph(nodes, subgraph, dists, node_features, y, node_label='drnl')
+        self.assertTrue(data.edge_index.shape[1] == 6)  # 4 edges minus 1->2 and 2->1
 
-        def test_seal_dynamic_dataset(self):
-            path = './dataset/seal_test_data'
-            use_coalesce = False
-            node_label = 'drnl'
-            ratio_per_hop = 1.
-            max_nodes_per_hop = None
-            data = Data(torch.rand(self.num_nodes, 2), self.edge_index, torch.ones(self.edge_index.size(1), dtype=int))
-            directed = False
-            num_hops = 1
-            train_dataset = SEALDynamicDataset(
-                path, data, self.test_edges, self.neg_test_edges, num_hops=num_hops, percent=1.0, split='train',
-                use_coalesce=use_coalesce,
-                node_label=node_label,
-                ratio_per_hop=ratio_per_hop,
-                max_nodes_per_hop=max_nodes_per_hop,
-                directed=directed,
-            )
-            labels = train_dataset.labels
-            self.assertTrue(len(labels) == self.test_edges.size(1) + self.neg_test_edges.size(
-                1))  # one prediction for each pos and neg edges
-            self.assertTrue(sum(labels) == self.test_edges.size(1))  # pos edges are labelled 1 and neg edges labelled 0
+    def test_seal_dynamic_dataset(self):
+        path = './dataset/seal_test_data'
+        use_coalesce = False
+        node_label = 'drnl'
+        ratio_per_hop = 1.
+        max_nodes_per_hop = None
+        data = Data(torch.rand(self.num_nodes, 2), self.edge_index, torch.ones(self.edge_index.size(1), dtype=int))
+        directed = False
+        num_hops = 1
+        train_dataset = SEALDynamicDataset(
+            path, data, self.test_edges, self.neg_test_edges, num_hops=num_hops, percent=1.0, split='train',
+            use_coalesce=use_coalesce,
+            node_label=node_label,
+            ratio_per_hop=ratio_per_hop,
+            max_nodes_per_hop=max_nodes_per_hop,
+            directed=directed,
+        )
+        labels = train_dataset.labels
+        self.assertTrue(len(labels) == self.test_edges.size(1) + self.neg_test_edges.size(
+            1))  # one prediction for each pos and neg edges
+        self.assertTrue(sum(labels) == self.test_edges.size(1))  # pos edges are labelled 1 and neg edges labelled 0
 
     def test_seal_dataset(self):
         path = './dataset/seal_test_data'
