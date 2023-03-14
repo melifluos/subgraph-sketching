@@ -16,9 +16,9 @@ import wandb
 import numpy as np
 
 from evaluation import evaluate_auc, evaluate_mrr, evaluate_hits
-from data import get_data, get_pos_neg_edges
+from data import get_data
 from heuristics import AA, CN, PPR, RA
-from utils import DEFAULT_DIC
+from utils import DEFAULT_DIC, get_pos_neg_edges
 
 def run(args):
   args = Namespace(**{**DEFAULT_DIC, **vars(args)})

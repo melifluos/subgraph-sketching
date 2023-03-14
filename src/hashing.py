@@ -144,8 +144,7 @@ class ElphHashes(object):
         Generate a hashing table that allows the size of the intersection of two nodes neighbours and 2-hop neighbour to be
         calculated in constant time
         @param num_nodes: The number of nodes in the graph
-        @param adj: A sparse csr adjacency matrix
-        @param max_hops: How many hops to approximate intersection sizes for
+        @param adj: Int Tensor [2, edges] edges in the graph
         @return: hashes, cards. Hashes is a dictionary{dictionary}{tensor} with keys num_hops, 'hll' or 'minhash', cards
         is a tensor[n_nodes, max_hops-1]
         """

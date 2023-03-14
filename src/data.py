@@ -3,17 +3,60 @@ Read and split ogb and planetoid datasets
 """
 
 import os
+import time
 
 import numpy as np
 import torch
+from torch.utils.data import DataLoader
 from ogb.linkproppred import PygLinkPropPredDataset
 from torch_geometric.data import Data
 from torch_geometric.datasets import Planetoid
 from torch_geometric.transforms import RandomLinkSplit
 from torch_geometric.utils import (add_self_loops, negative_sampling,
                                    to_undirected)
-from utils import ROOT_DIR
+from torch_geometric.loader import DataLoader as pygDataLoader
+import wandb
+
+from utils import ROOT_DIR, get_same_source_negs
 from lcc import get_largest_connected_component, remap_edges, get_node_mapper
+from datasets.seal import get_train_val_test_datasets
+from datasets.elph import get_hashed_train_val_test_datasets, make_train_eval_data
+
+
+def get_loaders(args, dataset, splits, directed):
+    train_data, val_data, test_data = splits['train'], splits['valid'], splits['test']
+    if args.model in {'ELPH', 'BUDDY'}:
+        train_dataset, val_dataset, test_dataset = get_hashed_train_val_test_datasets(dataset, train_data, val_data,
+                                                                                      test_data, args, directed)
+    else:
+        t0 = time.time()
+        train_dataset, val_dataset, test_dataset = get_train_val_test_datasets(dataset, train_data, val_data, test_data,
+                                                                               args)
+        print(f'SEAL preprocessing ran in {time.time() - t0} s')
+        if args.wandb:
+            wandb.log({"seal_preprocessing_time": time.time() - t0})
+
+    dl = DataLoader if args.model in {'hashgnn', 'hashing'} else pygDataLoader
+    train_loader = dl(train_dataset, batch_size=args.batch_size,
+                      shuffle=True, num_workers=args.num_workers)
+    # as the val and test edges are often sampled they also need to be shuffled
+    # the citation2 dataset has specific negatives for each positive and so can't be shuffled
+    shuffle_val = False if args.dataset_name.startswith('ogbl-citation') else True
+    val_loader = dl(val_dataset, batch_size=args.batch_size, shuffle=shuffle_val,
+                    num_workers=args.num_workers)
+    shuffle_test = False if args.dataset_name.startswith('ogbl-citation') else True
+    test_loader = dl(test_dataset, batch_size=args.batch_size, shuffle=shuffle_test,
+                     num_workers=args.num_workers)
+    if (args.dataset_name == 'ogbl-citation2') and (args.model in {'hashgnn', 'hashing'}):
+        train_eval_loader = dl(
+            make_train_eval_data(args, train_dataset, train_data.num_nodes,
+                                  n_pos_samples=5000), batch_size=args.batch_size, shuffle=False,
+            num_workers=args.num_workers)
+    else:
+        # todo get this working so we don't eval in the full training set
+        train_eval_loader = train_loader
+
+    return train_loader, train_eval_loader, val_loader, test_loader
 
 
 def get_data(args):
@@ -211,38 +254,3 @@ def use_lcc(dataset):
     )
     dataset.data = data
     return dataset
-
-
-def get_same_source_negs(num_nodes, num_negs_per_pos, pos_edge):
-    """
-    The ogb-citation datasets uses negatives with the same src, but different dst to the positives
-    :param num_nodes:
-    :param num_negs_per_pos:
-    :param pos_edge:
-    :return:
-    """
-    print(f'generating {num_negs_per_pos} single source negatives for each positive source node')
-    dst_neg = torch.randint(0, num_nodes, (1, pos_edge.size(1) * num_negs_per_pos), dtype=torch.long)
-    src_neg = pos_edge[0].repeat_interleave(num_negs_per_pos)
-    return torch.cat([src_neg.unsqueeze(0), dst_neg], dim=0)
-
-
-def get_pos_neg_edges(data, sample_frac=1):
-    """
-    extract the positive and negative supervision edges (as opposed to message passing edges) from data that has been transformed by RandomLinkSplit
-    :param data: A train, val or test split returned by RandomLinkSplit
-    :return: positive edge_index, negative edge_index.
-    """
-    device = data.edge_index.device
-    edge_index = data['edge_label_index'].to(device)
-    labels = data['edge_label'].to(device)
-    pos_edges = edge_index[:, labels == 1].t()
-    neg_edges = edge_index[:, labels == 0].t()
-    if sample_frac != 1:
-        n_pos = pos_edges.shape[0]
-        np.random.seed(123)
-        perm = np.random.permutation(n_pos)
-        perm = perm[:int(sample_frac * n_pos)]
-        pos_edges = pos_edges[perm, :]
-        neg_edges = neg_edges[perm, :]
-    return pos_edges.to(device), neg_edges.to(device)

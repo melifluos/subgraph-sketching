@@ -11,8 +11,8 @@ from torch_geometric.data import Data
 from torch_geometric.utils import to_undirected, is_undirected
 from ogb.linkproppred import PygLinkPropPredDataset
 
-from src.data import get_data, get_pos_neg_edges, get_ogb_train_negs, make_obg_supervision_edges, get_ogb_data
-from src.utils import ROOT_DIR
+from data import get_data, get_ogb_train_negs, make_obg_supervision_edges, get_ogb_data, get_loaders
+from utils import ROOT_DIR, get_pos_neg_edges
 from test_params import OPT
 
 
@@ -94,3 +94,13 @@ class DataTests(unittest.TestCase):
         train_negs = get_ogb_train_negs(split_edge, ei, num_nodes, num_negs=2, dataset_name='ogbl-citation2')
         self.assertTrue(train_negs.shape[0] == 2 * split_edge['train']['edge'].shape[0])
         self.assertTrue(train_negs[0][0] == train_negs[1][0])
+
+    def test_get_loaders(self):
+        opt = {'sample_size': None, 'dataset_name': 'Cora', 'num_hops': 2, 'max_dist': 10, 'max_nodes_per_hop': 10,
+               'data_appendix': None, 'val_pct': 0.1, 'test_pct': 0.2, 'train_sample': 1, 'dynamic_train': True,
+               'dynamic_val': True, 'model': 'linear', 'dynamic_test': True, 'node_label': 'drnl', 'ratio_per_hop': 1}
+        opt = {**OPT, **opt}
+        args = Namespace(**opt)
+        dataset, splits, directed, eval_metric = get_data(args)
+        train_loader, train_eval_loader, val_loader, test_loader = get_loaders(args, dataset, splits, directed)
+        # todo finish writing this test

@@ -12,9 +12,9 @@ from torch_geometric.data import Data
 
 from datasets.seal import SEALDataset, SEALDynamicDataset, k_hop_subgraph, \
     construct_pyg_graph
-from data import get_data, get_pos_neg_edges
+from data import get_data
 from test_params import OPT
-from utils import get_src_dst_degree
+from utils import get_src_dst_degree, get_pos_neg_edges
 
 
 class SEALDatasetTests(unittest.TestCase):

@@ -6,8 +6,9 @@ import os
 from distutils.util import strtobool
 
 import torch
+import numpy as np
 
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 DEFAULT_DIC = {'sample_size': None, 'dataset_name': 'Cora', 'num_hops': 2, 'max_dist': 10, 'max_nodes_per_hop': 10,
                'data_appendix': None, 'val_pct': 0.1, 'test_pct': 0.2, 'train_sample': 1, 'dynamic_train': True,
@@ -48,6 +49,42 @@ def select_embedding(args, num_nodes, device):
     else:
         emb = None
     return emb
+
+
+def get_pos_neg_edges(data, sample_frac=1):
+    """
+    extract the positive and negative supervision edges (as opposed to message passing edges) from data that has been
+     transformed by RandomLinkSplit
+    :param data: A train, val or test split returned by RandomLinkSplit
+    :return: positive edge_index, negative edge_index.
+    """
+    device = data.edge_index.device
+    edge_index = data['edge_label_index'].to(device)
+    labels = data['edge_label'].to(device)
+    pos_edges = edge_index[:, labels == 1].t()
+    neg_edges = edge_index[:, labels == 0].t()
+    if sample_frac != 1:
+        n_pos = pos_edges.shape[0]
+        np.random.seed(123)
+        perm = np.random.permutation(n_pos)
+        perm = perm[:int(sample_frac * n_pos)]
+        pos_edges = pos_edges[perm, :]
+        neg_edges = neg_edges[perm, :]
+    return pos_edges.to(device), neg_edges.to(device)
+
+
+def get_same_source_negs(num_nodes, num_negs_per_pos, pos_edge):
+    """
+    The ogb-citation datasets uses negatives with the same src, but different dst to the positives
+    :param num_nodes: Int node count
+    :param num_negs_per_pos: Int
+    :param pos_edge: Int Tensor[2, edges]
+    :return: Int Tensor[2, edges]
+    """
+    print(f'generating {num_negs_per_pos} single source negatives for each positive source node')
+    dst_neg = torch.randint(0, num_nodes, (1, pos_edge.size(1) * num_negs_per_pos), dtype=torch.long)
+    src_neg = pos_edge[0].repeat_interleave(num_negs_per_pos)
+    return torch.cat([src_neg.unsqueeze(0), dst_neg], dim=0)
 
 
 def neighbors(fringe, A, outgoing=True):

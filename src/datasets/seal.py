@@ -19,9 +19,8 @@ from torch_sparse import coalesce
 from tqdm import tqdm
 import scipy.sparse as ssp
 
-from utils import get_src_dst_degree, neighbors
+from utils import get_src_dst_degree, neighbors, get_pos_neg_edges
 from labelling_tricks import drnl_node_labeling, de_node_labeling, de_plus_node_labeling
-from data import get_pos_neg_edges
 
 
 class SEALDataset(InMemoryDataset):

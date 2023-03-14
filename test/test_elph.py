@@ -17,7 +17,7 @@ from torch_scatter import scatter_min
 from runners.train import train_gnn
 from runners.inference import get_gnn_preds
 from test_params import OPT, setup_seed
-from models.elph import ELPHGNN, LinkPredictor
+from models.elph import ELPH, LinkPredictor
 from utils import ROOT_DIR, select_embedding
 from datasets.elph import HashedDynamicDataset
 from hashing import ElphHashes
@@ -48,7 +48,7 @@ class ELPHTests(unittest.TestCase):
         hash_hops = 2
         args = self.args
         args.max_hash_hops = hash_hops
-        gnn = ELPHGNN(args, num_features=num_features)
+        gnn = ELPH(args, num_features=num_features)
         x, hashes, cards, emb = gnn(self.x, self.edge_index)
         self.assertTrue(x.shape == (self.n_nodes, args.hidden_channels))
         self.assertTrue(emb is None)
@@ -58,23 +58,23 @@ class ELPHTests(unittest.TestCase):
         self.assertTrue(hashes[0]['minhash'].shape == (self.n_nodes, args.minhash_num_perm))
         args.train_node_embedding = True
         emb = select_embedding(args, self.n_nodes, self.x.device)
-        gnn = ELPHGNN(args, num_features=num_features, node_embedding=emb)
+        gnn = ELPH(args, num_features=num_features, node_embedding=emb)
         x, hashes, cards, emb = gnn(self.x, self.edge_index)
         self.assertTrue(emb.shape == (self.n_nodes, args.hidden_channels))
         # not ideal, but currently still propagate features even when we're not using them
         args.use_feature = False
         emb = select_embedding(args, self.n_nodes, self.x.device)
-        gnn = ELPHGNN(args, num_features=num_features, node_embedding=emb)
+        gnn = ELPH(args, num_features=num_features, node_embedding=emb)
         x, hashes, cards, emb = gnn(self.x, self.edge_index)
         self.assertTrue(x is None)
         args.feature_prop = 'cat'
         emb = select_embedding(args, self.n_nodes, self.x.device)
-        gnn = ELPHGNN(args, num_features=num_features, node_embedding=emb)
+        gnn = ELPH(args, num_features=num_features, node_embedding=emb)
         x, hashes, cards, emb = gnn(self.x, self.edge_index)
         self.assertTrue(emb.shape == (self.n_nodes, (1 + gnn.num_layers) * args.hidden_channels))
         args.use_feature = True
         emb = select_embedding(args, self.n_nodes, self.x.device)
-        gnn = ELPHGNN(args, num_features=num_features, node_embedding=emb)
+        gnn = ELPH(args, num_features=num_features, node_embedding=emb)
         x, hashes, cards, emb = gnn(self.x, self.edge_index)
         self.assertTrue(emb.shape == (self.n_nodes, (1 + gnn.num_layers) * args.hidden_channels))
         self.assertTrue(x.shape == (self.n_nodes, (1 + gnn.num_layers) * args.hidden_channels))
@@ -82,7 +82,7 @@ class ELPHTests(unittest.TestCase):
     def test_model_forward(self):
         n_links = 10
         num_features = self.x.shape[1]
-        gnn = ELPHGNN(self.args, num_features)
+        gnn = ELPH(self.args, num_features)
         x, hashes, cards, _ = gnn(self.x, self.edge_index)
         links = torch.randint(self.n_nodes, (n_links, 2))
         sf = gnn.elph_hashes.get_subgraph_features(links, hashes, cards)
@@ -94,7 +94,7 @@ class ELPHTests(unittest.TestCase):
         num_features = self.x.shape[1]
         args = self.args
         predictor = LinkPredictor(args)
-        gnn = ELPHGNN(args, num_features)
+        gnn = ELPH(args, num_features)
         x, hashes, cards, _ = gnn(self.x, self.edge_index)
         links = torch.randint(self.n_nodes, (n_links, 2))
         sf = gnn.elph_hashes.get_subgraph_features(links, hashes, cards)

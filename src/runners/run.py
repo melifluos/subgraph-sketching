@@ -22,7 +22,7 @@ from tqdm import tqdm
 
 warnings.filterwarnings("ignore", category=SparseEfficiencyWarning)
 
-from data import get_data, pre_propagate_features
+from data import get_data, pre_propagate_features, get_loaders
 from evaluation import evaluate_auc, evaluate_hits, evaluate_mrr
 from datasets.seal import get_train_val_test_datasets
 from datasets.elph import get_hashed_train_val_test_datasets, make_train_eval_data
@@ -36,6 +36,7 @@ from inference import test
 def run(args):
     args = initialise_wandb(args)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # todo move the next 3 lines somewhere less obnoxious
     if (args.max_hash_hops == 1) and (not args.use_zero_one):
         print("WARNING: (0,1) feature knock out is not supported for 1 hop. Running with all features")
     print(f"executing on {device}")
@@ -43,11 +44,13 @@ def run(args):
     train_func = get_train_func(args)
     for rep in range(args.reps):
         dataset, splits, directed, eval_metric = get_data(args)
+        train_loader, train_eval_loader, val_loader, test_loader = get_loaders(args, dataset, splits, directed)
         train_data, val_data, test_data = splits['train'], splits['valid'], splits['test']
         if args.dataset_name.startswith('ogbl'):
             evaluator = Evaluator(name=args.dataset_name)
         else:
             evaluator = Evaluator(name='ogbl-ppa')  # this sets HR@100 as the metric
+        emb = select_embedding(args, train_data.num_nodes, device)
         model, optimizer = select_model(args, dataset, args.max_z, emb, device)
         val_res = test_res = best_epoch = 0
         print(f'running repetition {rep}')
