@@ -29,13 +29,57 @@ def print_model_params(model):
             print(param.data.shape)
 
 
+def select_embedding(args, num_nodes, device):
+    """
+    select a node embedding. Used by SEAL models (the E is Embedding)
+    and needed for ogb-ddi where there are no node features
+    :param args: Namespace of cmd args
+    :param num_nodes: Int number of nodes to produce embeddings for
+    :param device: cpu or cuda
+    :return: Torch.nn.Embedding [n_nodes, args.hidden_channels]
+    """
+    if args.train_node_embedding:
+        emb = torch.nn.Embedding(num_nodes, args.hidden_channels).to(device)
+    elif args.pretrained_node_embedding:
+        weight = torch.load(args.pretrained_node_embedding)
+        emb = torch.nn.Embedding.from_pretrained(weight)
+        emb.weight.requires_grad = False
+    else:
+        emb = None
+    return emb
+
+
 def neighbors(fringe, A, outgoing=True):
     """
-    Retrieve neighbours of nodes within the fringe
-    @param fringe: a set of nodeIDs
-    @param A: scipy csr if outgoing = True, otherwise scipy csc
-    @param outgoing: Boolean
-    @return:
+    Retrieve
+    neighbours
+    of
+    nodes
+    within
+    the
+    fringe
+
+    @param
+
+    fringe: a
+    set
+    of
+    nodeIDs
+
+    @param
+
+    A: scipy
+    csr if outgoing = True, otherwise
+    scipy
+    csc
+
+    @param
+
+    outgoing: Boolean
+
+    @
+
+    return:
     """
     if outgoing:
         res = set(A[list(fringe)].indices)
@@ -47,12 +91,43 @@ def neighbors(fringe, A, outgoing=True):
 
 def get_src_dst_degree(src, dst, A, max_nodes):
     """
-    currently this function assumes an undirected unweighted adjacency
-    @param src: torch Tensor[Int] [edges]
-    @param dst: torch Tensor[Int] [edges]
-    @param A: scipy sparse CSR adjacency matrix
-    @param max_nodes: caps the max degree
-    @return:
+    currently
+    this
+    function
+    assumes
+    an
+    undirected
+    unweighted
+    adjacency
+
+    @param
+
+    src: torch
+    Tensor[Int][edges]
+
+    @param
+
+    dst: torch
+    Tensor[Int][edges]
+
+    @param
+
+    A: scipy
+    sparse
+    CSR
+    adjacency
+    matrix
+
+    @param
+
+    max_nodes: caps
+    the
+    max
+    degree
+
+    @
+
+    return:
     """
     src_degree = A[src].sum() if (max_nodes is None or A[src].sum() <= max_nodes) else max_nodes
     dst_degree = A[dst].sum() if (max_nodes is None or A[src].sum() <= max_nodes) else max_nodes
@@ -61,8 +136,15 @@ def get_src_dst_degree(src, dst, A, max_nodes):
 
 def str2bool(x):
     """
-    hack to let wandb tune boolean vars
-    :param x: str or bool
+    hack
+    to
+    let
+    wandb
+    tune
+    boolean
+    vars
+    :param
+    x: str or bool
     :return: bool
     """
     if type(x) == bool:
