@@ -179,7 +179,7 @@ class HashingTests(unittest.TestCase):
         feat01 = neighbors21.difference(int11 | feat21 | feat31)
         self.assertTrue(isclose(len(feat01), features[(0, 1)], abs_tol=2))
 
-    def test_get_structure_features(self):
+    def test_get_subgraph_features(self):
         max_hops = 2
         self.args.max_hash_hops = max_hops
         eh = ElphHashes(self.args)

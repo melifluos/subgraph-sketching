@@ -51,35 +51,11 @@ def select_embedding(args, num_nodes, device):
 
 def neighbors(fringe, A, outgoing=True):
     """
-    Retrieve
-    neighbours
-    of
-    nodes
-    within
-    the
-    fringe
-
-    @param
-
-    fringe: a
-    set
-    of
-    nodeIDs
-
-    @param
-
-    A: scipy
-    csr if outgoing = True, otherwise
-    scipy
-    csc
-
-    @param
-
-    outgoing: Boolean
-
-    @
-
-    return:
+    Retrieve neighbours of nodes within the fringe
+    :param fringe: set of node IDs
+    :param A: scipy CSR sparse adjacency matrix
+    :param outgoing: bool
+    :return:
     """
     if outgoing:
         res = set(A[list(fringe)].indices)
@@ -91,43 +67,12 @@ def neighbors(fringe, A, outgoing=True):
 
 def get_src_dst_degree(src, dst, A, max_nodes):
     """
-    currently
-    this
-    function
-    assumes
-    an
-    undirected
-    unweighted
-    adjacency
-
-    @param
-
-    src: torch
-    Tensor[Int][edges]
-
-    @param
-
-    dst: torch
-    Tensor[Int][edges]
-
-    @param
-
-    A: scipy
-    sparse
-    CSR
-    adjacency
-    matrix
-
-    @param
-
-    max_nodes: caps
-    the
-    max
-    degree
-
-    @
-
-    return:
+    Assumes undirected, unweighted graph
+    :param src: Int Tensor[edges]
+    :param dst: Int Tensor[edges]
+    :param A: scipy CSR adjacency matrix
+    :param max_nodes: cap on max node degree
+    :return:
     """
     src_degree = A[src].sum() if (max_nodes is None or A[src].sum() <= max_nodes) else max_nodes
     dst_degree = A[dst].sum() if (max_nodes is None or A[src].sum() <= max_nodes) else max_nodes
@@ -136,15 +81,8 @@ def get_src_dst_degree(src, dst, A, max_nodes):
 
 def str2bool(x):
     """
-    hack
-    to
-    let
-    wandb
-    tune
-    boolean
-    vars
-    :param
-    x: str or bool
+    hack to allow wandb to tune boolean cmd args
+    :param x: str of bool
     :return: bool
     """
     if type(x) == bool:
