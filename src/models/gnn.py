@@ -3,10 +3,16 @@ Baseline GNN models
 """
 
 import torch
-from torch_geometric.nn import GCNConv, SAGEConv
+from torch import Tensor
 import torch.nn.functional as F
-from torch.nn import Linear, BatchNorm1d as BN
+from torch.nn import Linear, Parameter, BatchNorm1d as BN
 from torch_sparse import SparseTensor
+from torch_geometric.nn import GCNConv, SAGEConv
+from torch_geometric.nn.dense.linear import Linear as pygLinear
+from torch_geometric.nn.conv.gcn_conv import gcn_norm
+from torch_geometric.typing import Adj, OptTensor
+from torch_geometric.nn.inits import zeros
+import torch_sparse
 
 
 class GCN(torch.nn.Module):
@@ -34,6 +40,51 @@ class GCN(torch.nn.Module):
             x = F.dropout(x, p=self.dropout, training=self.training)
         x = self.convs[-1](x, adj_t)
         return x
+
+
+class GCNCustomConv(torch.nn.Module):
+    """
+    Class to propagate features
+    """
+
+    def __init__(self, in_channels, out_channels, bias=True, propagate_features=False, **kwargs):
+        super().__init__(**kwargs)
+
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self._cached_edge_index = None
+        self._cached_adj_t = None
+        self.propagate_features = propagate_features
+
+        self.lin = pygLinear(in_channels, out_channels, bias=False,
+                             weight_initializer='glorot')
+
+        if bias:
+            self.bias = Parameter(torch.Tensor(out_channels))
+        else:
+            self.register_parameter('bias', None)
+
+        self.reset_parameters()
+
+    def forward(self, x: Tensor, edge_index: Adj,
+                edge_weight: OptTensor = None) -> Tensor:
+
+        # do the XW bit first
+        x = self.lin(x)
+        # propagate_type: (x: Tensor, edge_weight: OptTensor)
+        edge_index, edge_weight = gcn_norm(  # yapf: disable
+            edge_index, edge_weight, x.size(0))
+        if self.propagate_features:
+            out = torch_sparse.spmm(edge_index, edge_weight, x.shape[0], x.shape[0], x)
+        else:
+            out = x
+        if self.bias is not None:
+            out += self.bias
+        return out
+
+    def reset_parameters(self):
+        self.lin.reset_parameters()
+        zeros(self.bias)
 
 
 class SAGE(torch.nn.Module):

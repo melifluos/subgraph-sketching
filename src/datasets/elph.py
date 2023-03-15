@@ -289,7 +289,7 @@ class HashedDynamicDataset(Dataset):
                 #                                                use_zero_one=self.use_zero_one)
                 # else:
                 structure_features = self.elph_hashes.get_subgraph_features(self.links[idx], self.hashes,
-                                                                                self.cards)
+                                                                            self.cards)
         else:
             structure_features = torch.zeros(8)
 

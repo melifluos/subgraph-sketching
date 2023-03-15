@@ -18,7 +18,7 @@ from torch.nn import Linear, Parameter
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
 from torch_geometric.utils import add_self_loops
 
-from pyg_models import GCNCustomConv
+from models.gnn import GCNCustomConv
 from labelling_tricks import get_drnl_lookup
 
 logger = logging.getLogger(__name__)
@@ -122,11 +122,162 @@ class LinkPredictor(torch.nn.Module):
 
 class ELPH(torch.nn.Module):
     """
-    Efficient Link Prediction with Hashes
+    propagating hashes, features and degrees with message passing
+    """
+
+    def __init__(self, args, num_features, node_embedding=None):
+        super(ELPH, self).__init__()
+        # hashing things
+        self.elph_hashes = ElphHashes(args)
+        self.init_hashes = None
+        self.init_hll = None
+        self.num_perm = args.minhash_num_perm
+        self.hll_size = 2 ^ args.hll_p
+        # gnn things
+        self.use_feature = args.use_feature
+        self.feature_prop = args.feature_prop  # None, residual, cat
+        self.node_embedding = node_embedding
+        self.propagate_embeddings = args.propagate_embeddings
+        self.sign_k = args.sign_k
+        # self.dropout = args.dropout
+        self.label_dropout = args.label_dropout
+        self.feature_dropout = args.feature_dropout
+        self.label_features_branch = args.label_features_branch
+        self.use_bn = args.use_bn
+        self.num_layers = args.max_hash_hops
+        self.dim = args.max_hash_hops * (args.max_hash_hops + 2)
+        # construct the nodewise NN components
+        self.convolution_builder(num_features, args.hidden_channels,
+                                 args)  # build the convolutions for features and embs
+        # construct the edgewise NN components
+        self.predictor = LinkPredictor(args, node_embedding is not None)
+        if self.sign_k != 0:
+            if self.propagate_embeddings:
+                # this is only used for the ddi dataset where nodes have no features and transductive node embeddings are needed
+                self.sign_embedding = SIGNEmbedding(args.hidden_channels, args.hidden_channels, args.hidden_channels,
+                                                    args.sign_k, args.sign_dropout)
+
+    def convolution_builder(self, num_features, hidden_channels, args):
+        self.convs = torch.nn.ModuleList()
+        if args.feature_prop in {'residual', 'cat'}:  # use a linear encoder
+            self.feature_encoder = Linear(num_features, hidden_channels)
+            self.convs.append(
+                GCNConv(hidden_channels, hidden_channels))
+        else:
+            self.convs.append(
+                GCNConv(num_features, hidden_channels))
+        for _ in range(self.num_layers - 1):
+            self.convs.append(
+                GCNConv(hidden_channels, hidden_channels))
+        if self.node_embedding is not None:
+            self.emb_convs = torch.nn.ModuleList()
+            for _ in range(self.num_layers):  # assuming the embedding has hidden_channels dimss
+                self.emb_convs.append(GCNConv(hidden_channels, hidden_channels))
+
+    def propagate_embeddings_func(self, edge_index):
+        num_nodes = self.node_embedding.num_embeddings
+        gcn_edge_index, _ = gcn_norm(edge_index, num_nodes=num_nodes)
+        return self.sign_embedding(self.node_embedding.weight, gcn_edge_index, num_nodes)
+
+    def feature_conv(self, x, edge_index, k):
+        if not self.use_feature:
+            return None
+        out = self.convs[k - 1](x, edge_index)
+        out = F.dropout(out, p=self.feature_dropout, training=self.training)
+        if self.feature_prop == 'residual':
+            out = x + out
+        return out
+
+    def embedding_conv(self, x, edge_index, k):
+        if x is None:
+            return x
+        out = self.emb_convs[k - 1](x, edge_index)
+        out = F.dropout(out, p=self.feature_dropout, training=self.training)
+        if self.feature_prop == 'residual':
+            out = x + out
+        return out
+
+    def encode_features(self, x):
+        if self.use_feature:
+            x = self.feature_encoder(x)
+            x = F.dropout(x, p=self.feature_dropout, training=self.training)
+        else:
+            x = None
+
+        return x
+
+    def append_features(self, x, emb, xs, embs):
+        if x is not None:
+            xs.append(x)
+        if emb is not None:
+            embs.append(emb)
+
+    def cat_features(self, xs, embs):
+        if len(xs) > 0:
+            x = torch.cat(xs, dim=-1)
+        else:
+            x = None
+        if len(embs) > 0:
+            emb = torch.cat(embs, dim=-1)
+        else:
+            emb = None
+        return x, emb
+
+    def forward(self, x, edge_index):
+        """
+        @param x: raw node features tensor [n_nodes, n_features]
+        @param adj_t: edge index tensor [2, num_links]
+        @return:
+        """
+        # emb = self.node_embedding.weight if self.node_embedding is not None else None
+        hash_edge_index, _ = add_self_loops(edge_index)  # unnormalised, but with self-loops
+        # if this is the first call then initialise the minhashes and hlls - these need to be the same for every model call
+        num_nodes, num_features = x.shape
+        if self.init_hashes == None:
+            self.init_hashes = self.elph_hashes.initialise_minhash(num_nodes).to(x.device)
+        if self.init_hll == None:
+            self.init_hll = self.elph_hashes.initialise_hll(num_nodes).to(x.device)
+        # initialise data tensors for storing k-hop hashes
+        cards = torch.zeros((num_nodes, self.num_layers))
+        node_hashings_table = {}
+        if self.feature_prop == 'cat':
+            xs, embs = [], []
+        for k in range(self.num_layers + 1):
+            logger.info(f"Calculating hop {k} hashes")
+            node_hashings_table[k] = {
+                'hll': torch.zeros((num_nodes, self.hll_size), dtype=torch.int8, device=edge_index.device),
+                'minhash': torch.zeros((num_nodes, self.num_perm), dtype=torch.int64, device=edge_index.device)}
+            start = time()
+            if k == 0:
+                node_hashings_table[k]['minhash'] = self.init_hashes
+                node_hashings_table[k]['hll'] = self.init_hll
+                if self.feature_prop in {'residual', 'cat'}:  # need to get features to the hidden dim
+                    x = self.encode_features(x)
+
+            else:
+                node_hashings_table[k]['hll'] = self.elph_hashes.hll_prop(node_hashings_table[k - 1]['hll'],
+                                                                          hash_edge_index)
+                node_hashings_table[k]['minhash'] = self.elph_hashes.minhash_prop(node_hashings_table[k - 1]['minhash'],
+                                                                                  hash_edge_index)
+                cards[:, k - 1] = self.elph_hashes.hll_count(node_hashings_table[k]['hll'])
+                x = self.feature_conv(x, edge_index, k)
+
+            logger.info(f'{k} hop hash generation ran in {time() - start} s')
+
+        # todo why am I returning None and what is going on here wiht embs?
+        if self.feature_prop == 'cat':
+            x, emb = self.cat_features(xs, embs)
+        return x, node_hashings_table, cards, None
+
+
+class BUDDY(torch.nn.Module):
+    """
+    Scalable version of ElPH that uses precomputation of subgraph features and SIGN style propagation
+    of node features
     """
 
     def __init__(self, args, num_features=None, node_embedding=None):
-        super(ELPH, self).__init__()
+        super(BUDDY, self).__init__()
 
         self.use_feature = args.use_feature
         self.dropout = args.dropout

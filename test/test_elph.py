@@ -27,18 +27,14 @@ class ELPHTests(unittest.TestCase):
     def setUp(self):
         self.n_nodes = 30
         degree = 5
-        p = 0.2
         self.num_features = 3
         self.x = torch.rand((self.n_nodes, self.num_features))
-        # self.G = nx.newman_watts_strogatz_graph(n=self.n_nodes, k=degree, p=p)
-        # edge_index = torch.tensor(np.array(self.G.edges)).T
         edge_index = barabasi_albert_graph(self.n_nodes, degree)
         edge_index = to_undirected(edge_index)
         self.edge_index, _ = add_self_loops(edge_index)
         edge_weight = torch.ones(self.edge_index.size(1), dtype=int)
         self.A = ssp.csr_matrix((edge_weight, (self.edge_index[0], self.edge_index[1])),
                                 shape=(self.n_nodes, self.n_nodes))
-        # self.A = nx.adjacency_matrix(self.G)
         self.args = Namespace(**OPT)
         self.args.model = 'ELPH'
         setup_seed(0)
@@ -85,8 +81,8 @@ class ELPHTests(unittest.TestCase):
         gnn = ELPH(self.args, num_features)
         x, hashes, cards, _ = gnn(self.x, self.edge_index)
         links = torch.randint(self.n_nodes, (n_links, 2))
-        sf = gnn.elph_hashes.get_subgraph_features(links, hashes, cards)
-        out = gnn.predictor(sf, x[links])
+        sgf = gnn.elph_hashes.get_subgraph_features(links, hashes, cards)
+        out = gnn.predictor(sgf, x[links])
         self.assertTrue(len(out) == n_links)
 
     def test_link_predictor(self):
@@ -102,3 +98,119 @@ class ELPHTests(unittest.TestCase):
         self.assertTrue(len(out) == n_links)
         out1 = predictor(sf, x[links])
         self.assertTrue(len(out1) == n_links)
+
+    def test_train_gnn(self):
+        n_links = 10
+        num_features = self.x.shape[1]
+        hash_hops = 2
+        self.args.max_hash_hops = hash_hops
+        args = self.args
+        gnn = ELPH(self.args, num_features)
+        parameters = list(gnn.parameters())
+        device = self.x.device
+        optimizer = torch.optim.Adam(params=parameters, lr=args.lr, weight_decay=args.weight_decay)
+        data = Data(self.x, self.edge_index)
+        root = f'{ROOT_DIR}/test/train_HashedDynamicDataset'
+        split = 'train'
+        pos_edges = torch.randint(self.n_nodes, (n_links, 2))
+        neg_edges = torch.randint(self.n_nodes, (n_links, 2))
+        hdd = HashedDynamicDataset(root, split, data, pos_edges, neg_edges, args, use_coalesce=False, directed=False,
+                                   load_features=False, load_hashes=False, use_zero_one=True,
+                                   cache_structure_features=False)
+        dl = DataLoader(hdd, batch_size=1,
+                        shuffle=False, num_workers=1)
+        loss = train_gnn(gnn, optimizer, dl, args, device)
+        self.assertTrue(type(loss) == float)
+        # try with embeddings
+        args.train_node_embedding = True
+        emb = select_embedding(args, self.n_nodes, self.x.device)
+        gnn = ELPH(args, num_features, emb)
+        self.assertTrue(gnn.node_embedding.weight.shape == (self.n_nodes, args.hidden_channels))
+        loss = train_gnn(gnn, optimizer, dl, args, device)
+        self.assertTrue(type(loss) == float)
+        # now check the propagation of embeddings also works
+        args.propagate_embeddings = True
+        gnn = ELPH(args, num_features, emb)
+        loss = train_gnn(gnn, optimizer, dl, args, device)
+        self.assertTrue(type(loss) == float)
+        # try without features
+        args.use_feature = False
+        gnn = ELPH(args, num_features, emb)
+        loss = train_gnn(gnn, optimizer, dl, args, device)
+        self.assertTrue(type(loss) == float)
+        # and now residual
+        args.feature_prop = 'residual'
+        gnn = ELPH(args, num_features, emb)
+        loss = train_gnn(gnn, optimizer, dl, args, device)
+        self.assertTrue(type(loss) == float)
+        # and jk / cat
+        args.feature_prop = 'cat'
+        gnn = ELPH(args, num_features, emb)
+        loss = train_gnn(gnn, optimizer, dl, args, device)
+        self.assertTrue(type(loss) == float)
+
+    def test_get_gnn_preds(self):
+        n_links = 10
+        num_features = self.x.shape[1]
+        hash_hops = 2
+        self.args.max_hash_hops = hash_hops
+        args = self.args
+        gnn = ELPH(args, num_features)
+        gnn.eval()
+        data = Data(self.x, self.edge_index)
+        root = f'{ROOT_DIR}/test/test_HashedDynamicDataset'
+        split = 'train'
+        pos_edges = torch.randint(self.n_nodes, (n_links, 2))
+        neg_edges = torch.randint(self.n_nodes, (n_links, 2))
+        hdd = HashedDynamicDataset(root, split, data, pos_edges, neg_edges, args, use_coalesce=False, directed=False,
+                                   load_features=False, load_hashes=False, use_zero_one=True,
+                                   cache_structure_features=False)
+        dl = DataLoader(hdd, batch_size=1,
+                        shuffle=False, num_workers=1)
+        pos_pred, neg_pred, pred, labels = get_gnn_preds(gnn, dl, self.x.device, args, None, split='test')
+        self.assertTrue(len(pos_pred == len(pos_edges)))
+        self.assertTrue(len(neg_pred == len(neg_edges)))
+        self.assertTrue(len(neg_pred == len(neg_edges) + len(pos_edges)))
+        self.assertTrue(torch.sum(labels) == len(pos_edges))
+        # try with embeddings
+        args.train_node_embedding = True
+        emb = select_embedding(args, self.n_nodes, self.x.device)
+        gnn = ELPH(args, num_features, emb)
+        self.assertTrue(gnn.node_embedding.weight.shape == (self.n_nodes, args.hidden_channels))
+        pos_pred, neg_pred, pred, labels = get_gnn_preds(gnn, dl, self.x.device, args, None, split='test')
+        self.assertTrue(len(pos_pred == len(pos_edges)))
+        self.assertTrue(len(neg_pred == len(neg_edges)))
+        self.assertTrue(len(neg_pred == len(neg_edges) + len(pos_edges)))
+        self.assertTrue(torch.sum(labels) == len(pos_edges))
+        # now check the propagation of embeddings also works
+        args.propagate_embeddings = True
+        gnn = ELPH(args, num_features, emb)
+        pos_pred, neg_pred, pred, labels = get_gnn_preds(gnn, dl, self.x.device, args, None, split='test')
+        self.assertTrue(len(pos_pred == len(pos_edges)))
+        self.assertTrue(len(neg_pred == len(neg_edges)))
+        self.assertTrue(len(neg_pred == len(neg_edges) + len(pos_edges)))
+        self.assertTrue(torch.sum(labels) == len(pos_edges))
+        # w/o features
+        args.use_feature = False
+        gnn = ELPH(args, num_features, emb)
+        pos_pred, neg_pred, pred, labels = get_gnn_preds(gnn, dl, self.x.device, args, None, split='test')
+        self.assertTrue(len(pos_pred == len(pos_edges)))
+        self.assertTrue(len(neg_pred == len(neg_edges)))
+        self.assertTrue(len(neg_pred == len(neg_edges) + len(pos_edges)))
+        self.assertTrue(torch.sum(labels) == len(pos_edges))
+        # residual
+        args.feauture_prop = 'residual'
+        gnn = ELPH(args, num_features, emb)
+        pos_pred, neg_pred, pred, labels = get_gnn_preds(gnn, dl, self.x.device, args, None, split='test')
+        self.assertTrue(len(pos_pred == len(pos_edges)))
+        self.assertTrue(len(neg_pred == len(neg_edges)))
+        self.assertTrue(len(neg_pred == len(neg_edges) + len(pos_edges)))
+        self.assertTrue(torch.sum(labels) == len(pos_edges))
+        # cat / jk
+        args.feauture_prop = 'cat'
+        gnn = ELPH(args, num_features, emb)
+        pos_pred, neg_pred, pred, labels = get_gnn_preds(gnn, dl, self.x.device, args, None, split='test')
+        self.assertTrue(len(pos_pred == len(pos_edges)))
+        self.assertTrue(len(neg_pred == len(neg_edges)))
+        self.assertTrue(len(neg_pred == len(neg_edges) + len(pos_edges)))
+        self.assertTrue(torch.sum(labels) == len(pos_edges))

@@ -26,7 +26,7 @@ from data import get_data, pre_propagate_features, get_loaders
 from evaluation import evaluate_auc, evaluate_hits, evaluate_mrr
 from datasets.seal import get_train_val_test_datasets
 from datasets.elph import get_hashed_train_val_test_datasets, make_train_eval_data
-from models.elph import ELPH, ELP, ELPHGNN
+from models.elph import ELPH, BUDDY
 from models.seal import SEALDGCNN, SEALGCN, SEALGIN, SEALSAGE
 from utils import ROOT_DIR, print_model_params, select_embedding, str2bool
 from wandb_setup import initialise_wandb
@@ -112,9 +112,9 @@ def select_model(args, dataset, max_z, emb, device):
         model = SEALGIN(args.hidden_channels, args.num_layers, max_z, dataset.num_features,
                         args.use_feature, node_embedding=emb, dropout=args.dropout).to(device)
     elif args.model == 'BUDDY':
-        model = ELPH(args, dataset.num_features, node_embedding=emb).to(device)
+        model = BUDDY(args, dataset.num_features, node_embedding=emb).to(device)
     elif args.model == 'ELPH':
-        model = ELPHGNN(args, dataset.num_features, node_embedding=emb).to(device)
+        model = ELPH(args, dataset.num_features, node_embedding=emb).to(device)
     else:
         raise NotImplementedError
     parameters = list(model.parameters())
