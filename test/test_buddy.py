@@ -41,3 +41,23 @@ class ELPHTests(unittest.TestCase):
         self.args = Namespace(**OPT)
         self.args.model = 'BUDDY'
         setup_seed(0)
+
+    def test_propagate(self):
+        num_features = self.x.shape[1]
+        hash_hops = 2
+        args = self.args
+        args.max_hash_hops = hash_hops
+        sgf = torch.rand((self.n_nodes, hash_hops * (hash_hops + 2)))
+        gnn = BUDDY(args, num_features=num_features)
+        x = gnn(sgf, self.x)
+
+    def test_feature_forward(self):
+        pass
+
+    def test_embedding_forward(self):
+        pass
+
+
+
+    def test_forward(self):
+        pass
