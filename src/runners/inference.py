@@ -30,17 +30,11 @@ def test(model, evaluator, train_loader, val_loader, test_loader, args, device, 
     model.eval()
     print("get train predictions")
     test_func = get_test_func(args.model)
-    if args.dataset_name != 'ogbl-citation2':  # can't filter if metric is mrr
-        train_eval_samples = len(val_loader.dataset)  # No need for more than this to diagnose overfitting
-    else:
-        train_eval_samples = inf
-    pos_train_pred, neg_train_pred, train_pred, train_true = test_func(model, train_loader, device, args,
-                                                                       train_eval_samples, split='train')
+    pos_train_pred, neg_train_pred, train_pred, train_true = test_func(model, train_loader, device, args, split='train')
     print("get val predictions")
     pos_val_pred, neg_val_pred, val_pred, val_true = test_func(model, val_loader, device, args, split='val')
     print("get test predictions")
-    pos_test_pred, neg_test_pred, test_pred, test_true = test_func(model, test_loader, device, args,
-                                                                   args.test_samples, split='test')
+    pos_test_pred, neg_test_pred, test_pred, test_true = test_func(model, test_loader, device, args, split='test')
 
     if eval_metric == 'hits':
         results = evaluate_hits(evaluator, pos_train_pred, neg_train_pred, pos_val_pred, neg_val_pred, pos_test_pred,

@@ -1,27 +1,20 @@
 import unittest
 from argparse import Namespace
 
-import numpy as np
-from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import add_self_loops, to_undirected
 from torch_geometric.data import Data
 from torch_geometric.utils.random import barabasi_albert_graph
-from torch.utils.data import DataLoader
-from tqdm import tqdm
 import torch
+from torch.utils.data import DataLoader
 import scipy.sparse as ssp
-# from datasketch import MinHash, HyperLogLogPlusPlus
-# import networkx as nx
-from torch_scatter import scatter_min
 
 from runners.train import train_elph
 from runners.inference import get_elph_preds
+from runners.run import run
 from test_params import OPT, setup_seed
 from models.elph import ELPH, LinkPredictor
 from utils import ROOT_DIR, select_embedding
 from datasets.elph import HashedDynamicDataset
-from runners.run import run
-from hashing import ElphHashes
 
 
 class ELPHTests(unittest.TestCase):
@@ -168,7 +161,7 @@ class ELPHTests(unittest.TestCase):
                                    cache_structure_features=False)
         dl = DataLoader(hdd, batch_size=1,
                         shuffle=False, num_workers=1)
-        pos_pred, neg_pred, pred, labels = get_elph_preds(gnn, dl, self.x.device, args, None, split='test')
+        pos_pred, neg_pred, pred, labels = get_elph_preds(gnn, dl, self.x.device, args, split='test')
         self.assertTrue(len(pos_pred == len(pos_edges)))
         self.assertTrue(len(neg_pred == len(neg_edges)))
         self.assertTrue(len(neg_pred == len(neg_edges) + len(pos_edges)))
@@ -178,7 +171,7 @@ class ELPHTests(unittest.TestCase):
         emb = select_embedding(args, self.n_nodes, self.x.device)
         gnn = ELPH(args, num_features, emb)
         self.assertTrue(gnn.node_embedding.weight.shape == (self.n_nodes, args.hidden_channels))
-        pos_pred, neg_pred, pred, labels = get_elph_preds(gnn, dl, self.x.device, args, None, split='test')
+        pos_pred, neg_pred, pred, labels = get_elph_preds(gnn, dl, self.x.device, args, split='test')
         self.assertTrue(len(pos_pred == len(pos_edges)))
         self.assertTrue(len(neg_pred == len(neg_edges)))
         self.assertTrue(len(neg_pred == len(neg_edges) + len(pos_edges)))
@@ -186,7 +179,7 @@ class ELPHTests(unittest.TestCase):
         # now check the propagation of embeddings also works
         args.propagate_embeddings = True
         gnn = ELPH(args, num_features, emb)
-        pos_pred, neg_pred, pred, labels = get_elph_preds(gnn, dl, self.x.device, args, None, split='test')
+        pos_pred, neg_pred, pred, labels = get_elph_preds(gnn, dl, self.x.device, args, split='test')
         self.assertTrue(len(pos_pred == len(pos_edges)))
         self.assertTrue(len(neg_pred == len(neg_edges)))
         self.assertTrue(len(neg_pred == len(neg_edges) + len(pos_edges)))
@@ -194,7 +187,7 @@ class ELPHTests(unittest.TestCase):
         # w/o features
         args.use_feature = False
         gnn = ELPH(args, num_features, emb)
-        pos_pred, neg_pred, pred, labels = get_elph_preds(gnn, dl, self.x.device, args, None, split='test')
+        pos_pred, neg_pred, pred, labels = get_elph_preds(gnn, dl, self.x.device, args, split='test')
         self.assertTrue(len(pos_pred == len(pos_edges)))
         self.assertTrue(len(neg_pred == len(neg_edges)))
         self.assertTrue(len(neg_pred == len(neg_edges) + len(pos_edges)))
@@ -202,7 +195,7 @@ class ELPHTests(unittest.TestCase):
         # residual
         args.feauture_prop = 'residual'
         gnn = ELPH(args, num_features, emb)
-        pos_pred, neg_pred, pred, labels = get_elph_preds(gnn, dl, self.x.device, args, None, split='test')
+        pos_pred, neg_pred, pred, labels = get_elph_preds(gnn, dl, self.x.device, args, split='test')
         self.assertTrue(len(pos_pred == len(pos_edges)))
         self.assertTrue(len(neg_pred == len(neg_edges)))
         self.assertTrue(len(neg_pred == len(neg_edges) + len(pos_edges)))
@@ -210,7 +203,7 @@ class ELPHTests(unittest.TestCase):
         # cat / jk
         args.feauture_prop = 'cat'
         gnn = ELPH(args, num_features, emb)
-        pos_pred, neg_pred, pred, labels = get_elph_preds(gnn, dl, self.x.device, args, None, split='test')
+        pos_pred, neg_pred, pred, labels = get_elph_preds(gnn, dl, self.x.device, args, split='test')
         self.assertTrue(len(pos_pred == len(pos_edges)))
         self.assertTrue(len(neg_pred == len(neg_edges)))
         self.assertTrue(len(neg_pred == len(neg_edges) + len(pos_edges)))
@@ -218,6 +211,7 @@ class ELPHTests(unittest.TestCase):
 
     def test_run(self):
         # no exceptions is a pass
+        self.args.train_samples = 0.1
         self.args.epochs = 1
         self.args.dataset_name = 'Cora'
         run(self.args)
