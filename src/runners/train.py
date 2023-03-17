@@ -82,8 +82,6 @@ def train_buddy(model, optimizer, train_loader, args, device, emb=None):
         wandb.log({"train_epoch_time": time.time() - t0})
 
     print(f'training ran in {time.time() - t0}')
-    if args.model in {'linear', 'pmi', 'ra', 'aa', 'one_layer'}:
-        model.print_params()
 
     if args.log_features:
         model.log_wandb()
