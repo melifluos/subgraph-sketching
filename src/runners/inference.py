@@ -13,10 +13,10 @@ from evaluation import evaluate_auc, evaluate_hits, evaluate_mrr
 from utils import get_num_samples
 
 
-def get_test_func(args, split):
-    if args.model == 'ELPH':
+def get_test_func(model_str):
+    if model_str == 'ELPH':
         return get_elph_preds
-    elif args.model == 'BUDDY':
+    elif model_str == 'BUDDY':
         return get_buddy_preds
     else:
         return get_preds
@@ -28,19 +28,20 @@ def test(model, evaluator, train_loader, val_loader, test_loader, args, device, 
     t0 = time.time()
     model.eval()
     print("get train predictions")
-    train_pred_func = get_test_func(args, 'train')
+    # train_pred_func = get_test_func(args, 'train')
+    test_func = get_test_func(args.model)
     if args.dataset_name != 'ogbl-citation2':  # can't filter if metric is mrr
         train_eval_samples = len(val_loader.dataset)  # No need for more than this to diagnose overfitting
     else:
         train_eval_samples = inf
-    pos_train_pred, neg_train_pred, train_pred, train_true = train_pred_func(model, train_loader, device, args,
+    pos_train_pred, neg_train_pred, train_pred, train_true = test_func(model, train_loader, device, args,
                                                                              train_eval_samples, split='train')
     print("get val predictions")
-    val_pred_func = get_test_func(args, 'val')
-    pos_val_pred, neg_val_pred, val_pred, val_true = val_pred_func(model, val_loader, device, args, split='val')
+    # val_pred_func = get_test_func(args, 'val')
+    pos_val_pred, neg_val_pred, val_pred, val_true = test_func(model, val_loader, device, args, split='val')
     print("get test predictions")
-    test_pred_func = get_test_func(args, 'test')
-    pos_test_pred, neg_test_pred, test_pred, test_true = test_pred_func(model, test_loader, device, args,
+    # test_pred_func = get_test_func(args, 'test')
+    pos_test_pred, neg_test_pred, test_pred, test_true = test_func(model, test_loader, device, args,
                                                                         args.test_samples, split='test')
 
     if eval_metric == 'hits':
