@@ -302,7 +302,7 @@ class HashedDynamicDataset(Dataset):
 
 
 def get_hashed_train_val_test_datasets(dataset, train_data, val_data, test_data, args, directed=False):
-    root = f'{dataset.root}_hashedgnn_'
+    root = f'{dataset.root}_elph_'
     print(f'data path: {root}')
     use_coalesce = True if args.dataset_name == 'ogbl-collab' else False
     pos_train_edge, neg_train_edge = get_pos_neg_edges(train_data)
@@ -395,11 +395,11 @@ def make_train_eval_data(args, train_dataset, num_nodes, hll_p=8, n_pos_samples=
             neg_sample * negs_per_pos), 'structure features are a different shape link object. Delete structure features file and regenerate'
     else:  # generate negative structure features
         #  we're going to need the hashes
-        file_stub = dataset_name.replace('-', '_')  # not sure how this happens, I think pyg does it
+        file_stub = dataset_name.replace('-', '_')  # pyg likes to add -
         if args.max_hash_hops == 3:
-            hash_name = f'{ROOT_DIR}/dataset/{dataset_name}/{file_stub}_hashedgnn__train_3hop_hashcache.pt'
+            hash_name = f'{ROOT_DIR}/dataset/{dataset_name}/{file_stub}_elph__train_3hop_hashcache.pt'
         else:
-            hash_name = f'{ROOT_DIR}/dataset/{dataset_name}/{file_stub}_hashedgnn__train_hashcache.pt'
+            hash_name = f'{ROOT_DIR}/dataset/{dataset_name}/{file_stub}_elph__train_hashcache.pt'
         print(f'looking for hashes at {hash_name}')
         eh = ElphHashes(args)
         if os.path.exists(hash_name):

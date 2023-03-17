@@ -8,6 +8,7 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import wandb
+import numpy as np
 
 from evaluation import evaluate_auc, evaluate_hits, evaluate_mrr
 from utils import get_num_samples
@@ -58,12 +59,7 @@ def test(model, evaluator, train_loader, val_loader, test_loader, args, device, 
 
 @torch.no_grad()
 def get_preds(model, loader, device, args, emb=None, split=None):
-    # sample_arg = get_sample_arg(split, args)
-    # if sample_arg <= 1:
-    #     samples = len(loader.dataset) * sample_arg
-    # else:
-    #     samples = sample_arg
-    samples = get_split_samples(split, args, len(loader.dataset))
+    n_samples = get_split_samples(split, args, len(loader.dataset))
     y_pred, y_true = [], []
     pbar = tqdm(loader, ncols=70)
     if args.wandb:
@@ -87,7 +83,7 @@ def get_preds(model, loader, device, args, emb=None, split=None):
             y_true.append(data.y.view(-1).cpu().to(torch.float))
         y_pred.append(logits.view(-1).cpu())
         batch_processing_times.append(time.time() - start_time)
-        if (batch_count + 1) * args.batch_size > samples:
+        if (batch_count + 1) * args.batch_size > n_samples:
             del data
             torch.cuda.empty_cache()
             break
@@ -100,13 +96,14 @@ def get_preds(model, loader, device, args, emb=None, split=None):
     pred, true = torch.cat(y_pred), torch.cat(y_true)
     pos_pred = pred[true == 1]
     neg_pred = pred[true == 0]
-    samples_used = len(loader.dataset) if samples > len(loader.dataset) else samples
+    samples_used = len(loader.dataset) if n_samples > len(loader.dataset) else n_samples
     print(f'{len(pos_pred)} positives and {len(neg_pred)} negatives for sample of {samples_used} edges')
     return pos_pred, neg_pred, pred, true
 
 
 @torch.no_grad()
-def get_buddy_preds(model, loader, device, args, sample_size=inf, split=None):
+def get_buddy_preds(model, loader, device, args, split=None):
+    n_samples = get_split_samples(split, args, len(loader.dataset))
     t0 = time.time()
     preds = []
     data = loader.dataset
@@ -137,7 +134,7 @@ def get_buddy_preds(model, loader, device, args, sample_size=inf, split=None):
             RA = None
         logits = model(structure_features, node_features, degrees[:, 0], degrees[:, 1], RA, batch_emb)
         preds.append(logits.view(-1).cpu())
-        if (batch_count + 1) * args.eval_batch_size > sample_size:
+        if (batch_count + 1) * args.eval_batch_size > n_samples:
             break
 
     if args.wandb:
@@ -172,7 +169,8 @@ def get_split_samples(split, args, dataset_len):
 
 
 @torch.no_grad()
-def get_elph_preds(model, loader, device, args, sample_size=inf, split=None):
+def get_elph_preds(model, loader, device, args, split=None):
+    n_samples = get_split_samples(split, args, len(loader.dataset))
     t0 = time.time()
     preds = []
     data = loader.dataset
@@ -200,6 +198,8 @@ def get_elph_preds(model, loader, device, args, sample_size=inf, split=None):
         batch_node_features = None if node_features is None else node_features[curr_links]
         logits = model.predictor(structure_features, batch_node_features, batch_emb)
         preds.append(logits.view(-1).cpu())
+        if (batch_count + 1) * args.eval_batch_size > n_samples:
+            break
 
     if args.wandb:
         wandb.log({f"inference_{split}_epoch_time": time.time() - t0})
