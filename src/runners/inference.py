@@ -28,21 +28,18 @@ def test(model, evaluator, train_loader, val_loader, test_loader, args, device, 
     t0 = time.time()
     model.eval()
     print("get train predictions")
-    # train_pred_func = get_test_func(args, 'train')
     test_func = get_test_func(args.model)
     if args.dataset_name != 'ogbl-citation2':  # can't filter if metric is mrr
         train_eval_samples = len(val_loader.dataset)  # No need for more than this to diagnose overfitting
     else:
         train_eval_samples = inf
     pos_train_pred, neg_train_pred, train_pred, train_true = test_func(model, train_loader, device, args,
-                                                                             train_eval_samples, split='train')
+                                                                       train_eval_samples, split='train')
     print("get val predictions")
-    # val_pred_func = get_test_func(args, 'val')
     pos_val_pred, neg_val_pred, val_pred, val_true = test_func(model, val_loader, device, args, split='val')
     print("get test predictions")
-    # test_pred_func = get_test_func(args, 'test')
     pos_test_pred, neg_test_pred, test_pred, test_true = test_func(model, test_loader, device, args,
-                                                                        args.test_samples, split='test')
+                                                                   args.test_samples, split='test')
 
     if eval_metric == 'hits':
         results = evaluate_hits(evaluator, pos_train_pred, neg_train_pred, pos_val_pred, neg_val_pred, pos_test_pred,
@@ -163,20 +160,12 @@ def get_split_samples(split, args, dataset_len):
     if split == 'train':
         if args.dynamic_train:
             samples = get_num_samples(args.train_samples, dataset_len)
-        #     return args.train_samples
-        # else:
-        #     return inf
     elif split in {'val', 'valid'}:
         if args.dynamic_val:
             samples = get_num_samples(args.val_samples, dataset_len)
-        # else:
-        #     return inf
     elif split == 'test':
         if args.dynamic_test:
             samples = get_num_samples(args.test_samples, dataset_len)
-        #     return args.test_samples
-        # else:
-        #     return inf
     else:
         raise NotImplementedError(f'split: {split} is not a valid split')
     return samples
