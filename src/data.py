@@ -36,7 +36,7 @@ def get_loaders(args, dataset, splits, directed):
         if args.wandb:
             wandb.log({"seal_preprocessing_time": time.time() - t0})
 
-    dl = DataLoader if args.model in {'hashgnn', 'hashing'} else pygDataLoader
+    dl = DataLoader if args.model in {'ELPH', 'BUDDY'} else pygDataLoader
     train_loader = dl(train_dataset, batch_size=args.batch_size,
                       shuffle=True, num_workers=args.num_workers)
     # as the val and test edges are often sampled they also need to be shuffled
@@ -47,7 +47,7 @@ def get_loaders(args, dataset, splits, directed):
     shuffle_test = False if args.dataset_name.startswith('ogbl-citation') else True
     test_loader = dl(test_dataset, batch_size=args.batch_size, shuffle=shuffle_test,
                      num_workers=args.num_workers)
-    if (args.dataset_name == 'ogbl-citation2') and (args.model in {'hashgnn', 'hashing'}):
+    if (args.dataset_name == 'ogbl-citation2') and (args.model in {'ELPH', 'BUDDY'}):
         train_eval_loader = dl(
             make_train_eval_data(args, train_dataset, train_data.num_nodes,
                                   n_pos_samples=5000), batch_size=args.batch_size, shuffle=False,

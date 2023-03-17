@@ -162,7 +162,7 @@ if __name__ == '__main__':
     parser.add_argument('--hash_db', type=str, default=None, help='Path to the pre-generated hash database.')
     parser.add_argument('--year', type=int, default=0, help='filter training data from before this year')
     # GNN settings
-    parser.add_argument('--model', type=str, default='hashing')
+    parser.add_argument('--model', type=str, default='BUDDY')
     parser.add_argument('--sortpool_k', type=float, default=0.6)
     parser.add_argument('--label_pooling', type=str, default='add', help='add or mean')
     parser.add_argument('--num_layers', type=int, default=3)
@@ -176,7 +176,7 @@ if __name__ == '__main__':
     parser.add_argument('--sign_dropout', type=float, default=0.5)
     parser.add_argument('--save_model', action='store_true', help='save the model to use later for inference')
     parser.add_argument('--feature_prop', type=str, default='gcn',
-                        help='how to propagate hashgnn node features. Values are gcn, residual (resGCN) or cat (jumping knowledge networks)')
+                        help='how to propagate ELPH node features. Values are gcn, residual (resGCN) or cat (jumping knowledge networks)')
     parser.add_argument('--seal_pooling', type=str, default='edge', help='how SEAL pools features in the subgraph')
     # Subgraph extraction settings
     parser.add_argument('--num_hops', type=int, default=1)

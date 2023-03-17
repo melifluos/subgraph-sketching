@@ -74,7 +74,8 @@ def get_preds(model, loader, device, args, emb=None, split=None):
     t0 = time.time()
     for batch_count, data in enumerate(pbar):
         start_time = time.time()
-        if args.model == 'hashing':
+        # todo this should not get hit, refactor out the if statement
+        if args.model == 'BUDDY':
             data_dev = [elem.squeeze().to(device) for elem in data]
             logits = model(*data_dev[:-1])
             y_true.append(data[-1].view(-1).cpu().to(torch.float))

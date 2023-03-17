@@ -118,7 +118,8 @@ def train(model, optimizer, train_loader, args, device, emb=None):
     for batch_count, data in enumerate(pbar):
         start_time = time.time()
         optimizer.zero_grad()
-        if args.model == 'hashing':
+        # todo this loop should no longer be hit as this function isn't called for BUDDY
+        if args.model == 'BUDDY':
             data_dev = [elem.squeeze().to(device) for elem in data]
             logits = model(*data_dev[:-1])  # everything but the labels
             loss = get_loss(args.loss)(logits, data[-1].squeeze(0).to(device))

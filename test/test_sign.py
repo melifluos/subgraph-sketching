@@ -31,7 +31,7 @@ class SIGNTests(unittest.TestCase):
     def test_generate_sign_features(self):
         sign_k = 2
         n_features = 2
-        opt = {'sample_size': None, 'dataset_name': 'Cora', 'model': 'hashing', 'hidden_dimension': 3, 'sign_k': sign_k}
+        opt = {'sample_size': None, 'dataset_name': 'Cora', 'hidden_dimension': 3, 'sign_k': sign_k}
         opt = {**OPT, **opt}
         args = Namespace(**opt)
         split = 'train'

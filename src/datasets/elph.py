@@ -215,9 +215,6 @@ class HashedDynamicDataset(Dataset):
             print(f'no structure features found at {structure_cache_name}. Need to generate them')
             hash_name = f'{self.root}_{self.split}{year_str}_{hop_str}hashcache.pt'
             cards_name = f'{self.root}_{self.split}{year_str}_{hop_str}cardcache.pt'
-            # if self.dbname is not None:
-            #     print(f"Using the hashdb found at: {self.dbname}")
-            #     self.hashdb = HashDB(self.dbname)
             if self.load_hashes and os.path.exists(hash_name):
                 print('loading hashes from disk')
                 hashes = torch.load(hash_name)
