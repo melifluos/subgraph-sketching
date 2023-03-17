@@ -5,10 +5,6 @@ constructing the hashed data objects used by elph and buddy
 import os
 from time import time
 from math import inf
-import collections
-import random
-import pickle
-import sqlite3 as sq
 
 import torch
 from torch_geometric.data import Dataset
@@ -17,7 +13,6 @@ from torch_sparse import coalesce
 import scipy.sparse as ssp
 import torch_sparse
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
-from torch_geometric.utils import add_self_loops
 
 from heuristics import RA
 from utils import ROOT_DIR, get_src_dst_degree, get_pos_neg_edges, get_same_source_negs
@@ -33,7 +28,7 @@ class HashedDynamicDataset(Dataset):
     def __init__(
             self, root, split, data, pos_edges, neg_edges, args, cache_structure_features=False, use_coalesce=False,
             directed=False, **kwargs):
-        if args.model != 'ELPH':
+        if args.model != 'ELPH':  # elph stores the hashes directly in the model class for message passing
             self.elph_hashes = ElphHashes(args)  # object for hash and subgraph feature operations
         self.split = split  # string: train, valid or test
         self.root = root
@@ -53,13 +48,6 @@ class HashedDynamicDataset(Dataset):
         self.structure_features = None
         self.hashes = None
         super(HashedDynamicDataset, self).__init__(root)
-
-        if args.dataset_name.startswith('ogbl-citation'):
-            # optionally reduce the number of pos or test edges for the large ogbl-citation dataset
-            if split == 'test' and args.test_citation_sample_size is not None:
-                self.sample_links(args.test_citation_sample_size)
-            elif split == 'valid' and args.val_citation_sample_size is not None:
-                self.sample_links(args.val_citation_sample_size)
 
         self.links = torch.cat([self.pos_edges, self.neg_edges], 0)  # [n_edges, 2]
         self.labels = [1] * self.pos_edges.size(0) + [0] * self.neg_edges.size(0)
@@ -153,14 +141,6 @@ class HashedDynamicDataset(Dataset):
         @return:
         """
         retval = False
-        # if self.cache_structure_features and self.dbname is not None:
-        #     print(f'looking for structure features in {self.dbname}')
-        #     self.hashdb = HashDB(self.dbname)
-        #     print(f"cached struct features found at: {self.dbname}")
-        #     print(self.hashdb.feature_counts(self.split), len(self.links))
-        #     assert self.hashdb.feature_counts(self.split) == len(
-        #         self.links), 'structure features are a different shape link object. Delete structure features file and regenerate'
-        #     retval = True
         # look on disk
         if self.cache_structure_features and os.path.exists(name):
             print(f'looking for structure features in {name}')
@@ -201,7 +181,6 @@ class HashedDynamicDataset(Dataset):
             hop_str = f'{self.max_hash_hops}hop_'
         else:
             hop_str = ''
-
         end_str = f'_{hop_str}structure_featurecache.pt'
         if self.args.dataset_name == 'ogbl-collab' and self.args.year > 0:
             year_str = f'year_{self.args.year}'
@@ -242,7 +221,6 @@ class HashedDynamicDataset(Dataset):
                     self.links), 'structure features are a different shape link object. Delete structure features file and regenerate'
                 torch.save(self.structure_features, structure_cache_name)
             else:  # we need the hashes if we're not storing the structure features or using the database
-                # if self.dbname is None:
                 self.hashes = hashes
                 self.cards = cards
         if self.args.floor_sf and self.structure_features is not None:
@@ -269,22 +247,12 @@ class HashedDynamicDataset(Dataset):
         src, dst = self.links[idx]
         if self.args.use_struct_feature:
             if self.cache_structure_features:
-                # if self.dbname is not None:
-                #     structure_features = self.hashdb.get_features(idx, split=self.split)
-                #     if not self.use_zero_one:
-                #         structure_features[[4, 5]] = 0
-                # else:
                 try:
                     structure_features = self.structure_features[idx]
                 except TypeError:  # structure features are only cached in te
                     structure_features = self.elph_hashes.get_subgraph_features(self.links[idx], self.hashes,
                                                                                 self.cards)
             else:
-                # if self.dbname is not None:
-                #     hashes = self.hashdb.get_hashes(ids=[src, dst], split=self.split, seed=0)
-                #     structure_features = get_subgraph_features(src, dst, hashes, max_hops=self.max_hash_hops,
-                #                                                use_zero_one=self.use_zero_one)
-                # else:
                 structure_features = self.elph_hashes.get_subgraph_features(self.links[idx], self.hashes,
                                                                             self.cards)
         else:

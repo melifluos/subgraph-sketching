@@ -128,6 +128,7 @@ class BUDDYTests(unittest.TestCase):
 
     def test_run(self):
         # no exceptions is a pass
+        self.args.train_samples = 0.1
         self.args.epochs = 1
         self.args.dataset_name = 'Cora'
         run(self.args)

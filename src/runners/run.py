@@ -142,10 +142,6 @@ if __name__ == '__main__':
     parser.add_argument('--train_samples', type=float, default=inf, help='the number of training edges or % if < 1')
     parser.add_argument('--val_samples', type=float, default=inf, help='the number of val edges or % if < 1')
     parser.add_argument('--test_samples', type=float, default=inf, help='the number of test edges or % if < 1')
-    parser.add_argument('--test_citation_sample_size', type=int, default=None,
-                        help='the number of test edges for citation')
-    parser.add_argument('--val_citation_sample_size', type=int, default=None,
-                        help='the number of val edges for citation')
     parser.add_argument('--preprocessing', type=str, default=None)
     parser.add_argument('--sign_k', type=int, default=0)
     parser.add_argument('--load_features', action='store_true', help='load features from disk for the hashing model')
@@ -159,12 +155,9 @@ if __name__ == '__main__':
     parser.add_argument('--floor_sf', type=str2bool, default=0,
                         help='the structure features represent counts, so should not be negative. If --floor_sf the min is set to 0')
     parser.add_argument('--train_cache_size', type=int, default=inf, help='the number of training edges to cache')
-    parser.add_argument('--hash_db', type=str, default=None, help='Path to the pre-generated hash database.')
     parser.add_argument('--year', type=int, default=0, help='filter training data from before this year')
     # GNN settings
     parser.add_argument('--model', type=str, default='BUDDY')
-    parser.add_argument('--sortpool_k', type=float, default=0.6)
-    parser.add_argument('--label_pooling', type=str, default='add', help='add or mean')
     parser.add_argument('--num_layers', type=int, default=3)
     parser.add_argument('--hidden_channels', type=int, default=32)
     parser.add_argument('--batch_size', type=int, default=32)
@@ -177,6 +170,9 @@ if __name__ == '__main__':
     parser.add_argument('--save_model', action='store_true', help='save the model to use later for inference')
     parser.add_argument('--feature_prop', type=str, default='gcn',
                         help='how to propagate ELPH node features. Values are gcn, residual (resGCN) or cat (jumping knowledge networks)')
+    # SEAL settings
+    parser.add_argument('--sortpool_k', type=float, default=0.6)
+    parser.add_argument('--label_pooling', type=str, default='add', help='add or mean')
     parser.add_argument('--seal_pooling', type=str, default='edge', help='how SEAL pools features in the subgraph')
     # Subgraph extraction settings
     parser.add_argument('--num_hops', type=int, default=1)
@@ -204,48 +200,32 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', type=float, default=5e-4, help='Weight decay for optimization')
     parser.add_argument('--epochs', type=int, default=50)
     # parser.add_argument('--runs', type=int, default=1)
-    parser.add_argument('--dynamic_train', action='store_true',
-                        help="dynamically extract enclosing subgraphs on the fly")
-    parser.add_argument('--dynamic_val', action='store_true')
-    parser.add_argument('--dynamic_test', action='store_true')
+
     parser.add_argument('--num_workers', type=int, default=4)
     parser.add_argument('--num_negs', type=int, default=1, help='number of negatives for each positive')
     parser.add_argument('--train_node_embedding', action='store_true',
                         help="also train free-parameter node embeddings together with GNN")
-    parser.add_argument('--pretrained_node_embedding', type=str, default=None,
-                        help="load pretrained node embeddings as additional node features")
     parser.add_argument('--propagate_embeddings', action='store_true',
                         help='propagate the node embeddings using the GCN diffusion operator')
     parser.add_argument('--loss', default='bce', type=str, help='bce or auc')
     parser.add_argument('--add_normed_features', dest='add_normed_features', type=str2bool,
                         help='only used for the linear model. Adds a set of features that are normalsied by sqrt(d_i*d_j) to calculate cosine sim')
     parser.add_argument('--use_RA', type=str2bool, default=False, help='whether to add resource allocation features')
+    # SEAL specific args
+    parser.add_argument('--dynamic_train', action='store_true',
+                        help="dynamically extract enclosing subgraphs on the fly")
+    parser.add_argument('--dynamic_val', action='store_true')
+    parser.add_argument('--dynamic_test', action='store_true')
+    parser.add_argument('--pretrained_node_embedding', type=str, default=None,
+                        help="load pretrained node embeddings as additional node features")
     # Testing settings
     parser.add_argument('--reps', type=int, default=1, help='the number of repetition of the experiment to run')
     parser.add_argument('--use_valedges_as_input', action='store_true')
     parser.add_argument('--eval_steps', type=int, default=1)
     parser.add_argument('--log_steps', type=int, default=1)
-    # parser.add_argument('--data_appendix', type=str, default='',
-    #                     help="an appendix to the data directory")
-    # parser.add_argument('--save_appendix', type=str, default='',
-    #                     help="an appendix to the save directory")
-    # parser.add_argument('--keep_old', action='store_true',
-    #                     help="do not overwrite old files in the save directory")
-    # parser.add_argument('--continue_from', type=int, default=None,
-    #                     help="from which epoch's checkpoint to continue training")
-    # parser.add_argument('--only_test', action='store_true',
-    #                     help="only test without training")
-    # parser.add_argument('--test_multiple_models', action='store_true',
-    #                     help="test multiple models together")
-    # parser.add_argument('--use_heuristic', type=str, default=None,
-    #                     help="test a link prediction heuristic (CN or AA)")
     parser.add_argument('--eval_metric', type=str, default='hits',
                         choices=('hits', 'mrr', 'auc'))
     parser.add_argument('--K', type=int, default=100, help='the hit rate @K')
-    parser.add_argument('--bulk_test', action='store_true',
-                        help='if true will run all test samples in parallel instead of batching in a DataLoader')
-    parser.add_argument('--bulk_val', action='store_true',
-                        help='if true will run all val samples in parallel instead of batching in a DataLoader')
     # hashing settings
     parser.add_argument('--use_zero_one', type=str2bool,
                         help="whether to use the counts of (0,1) and (1,0) neighbors")

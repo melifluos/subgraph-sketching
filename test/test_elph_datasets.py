@@ -22,7 +22,6 @@ class ELPHDatasetTests(unittest.TestCase):
     def setUp(self):
         self.n_nodes = 30
         degree = 5
-        p = 0.2
         self.x = torch.rand((self.n_nodes, 2))
         self.edge_index = barabasi_albert_graph(self.n_nodes, degree)
         self.edge_weight = torch.ones(self.edge_index.shape[1])
@@ -37,8 +36,6 @@ class ELPHDatasetTests(unittest.TestCase):
         pos_edges = torch.randint(self.n_nodes, (10, 2))
         neg_edges = torch.randint(self.n_nodes, (10, 2))
         split = 'test'
-        max_hops = 2
-        # ei = torch.tensor(list(self.G.edges())).T
         ei = self.edge_index
         data = Data(self.x, ei)
         root = f'{ROOT_DIR}/test/test_HashedDynamicDataset'
@@ -72,7 +69,6 @@ class ELPHDatasetTests(unittest.TestCase):
         n_pos_samples = 8
         negs_per_pos = 10
         split = 'train'
-        # ei = torch.tensor(list(self.G.edges())).T
         ei = self.edge_index
         data = Data(self.x, ei)
         root = f'{ROOT_DIR}/test/test_HashedDynamicDataset'

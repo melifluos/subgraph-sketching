@@ -53,7 +53,7 @@ def get_loaders(args, dataset, splits, directed):
                                   n_pos_samples=5000), batch_size=args.batch_size, shuffle=False,
             num_workers=args.num_workers)
     else:
-        # todo get this working so we don't eval in the full training set
+        # todo change this so that eval doesn't have to use the full training set
         train_eval_loader = train_loader
 
     return train_loader, train_eval_loader, val_loader, test_loader
