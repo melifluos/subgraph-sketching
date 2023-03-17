@@ -42,7 +42,7 @@ class DataTests(unittest.TestCase):
         self.valid['weight'] = ew
         x = torch.rand(size=(10, 3))
         data = Data(x=x, edge_index=ei, edge_weight=ew.unsqueeze(-1))
-        splits = get_ogb_data(data, self.split_edge, dataset_name='test_data', bulk_train=False)
+        splits = get_ogb_data(data, self.split_edge, dataset_name='test_dataset')
         self.assertTrue('test' in splits.keys())
         self.assertTrue(len(splits.keys()) == 3)
         self.assertTrue(torch.all(torch.eq(splits['train'].edge_index, splits['valid'].edge_index)))

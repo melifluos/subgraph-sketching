@@ -153,7 +153,7 @@ class ELPH(torch.nn.Module):
         self.predictor = LinkPredictor(args, node_embedding is not None)
         if self.sign_k != 0:
             if self.propagate_embeddings:
-                # this is only used for the ddi dataset where nodes have no features and transductive node embeddings are needed
+                # only used for the ddi where nodes have no features and transductive node embeddings are needed
                 self.sign_embedding = SIGNEmbedding(args.hidden_channels, args.hidden_channels, args.hidden_channels,
                                                     args.sign_k, args.sign_dropout)
 
@@ -171,7 +171,7 @@ class ELPH(torch.nn.Module):
                 GCNConv(hidden_channels, hidden_channels))
         if self.node_embedding is not None:
             self.emb_convs = torch.nn.ModuleList()
-            for _ in range(self.num_layers):  # assuming the embedding has hidden_channels dimss
+            for _ in range(self.num_layers):  # assuming the embedding has hidden_channels dims
                 self.emb_convs.append(GCNConv(hidden_channels, hidden_channels))
 
     def propagate_embeddings_func(self, edge_index):
@@ -229,7 +229,6 @@ class ELPH(torch.nn.Module):
         @param adj_t: edge index tensor [2, num_links]
         @return:
         """
-        # emb = self.node_embedding.weight if self.node_embedding is not None else None
         hash_edge_index, _ = add_self_loops(edge_index)  # unnormalised, but with self-loops
         # if this is the first call then initialise the minhashes and hlls - these need to be the same for every model call
         num_nodes, num_features = x.shape
@@ -240,8 +239,8 @@ class ELPH(torch.nn.Module):
         # initialise data tensors for storing k-hop hashes
         cards = torch.zeros((num_nodes, self.num_layers))
         node_hashings_table = {}
-        if self.feature_prop == 'cat':
-            xs, embs = [], []
+        # if self.feature_prop == 'cat':
+        #     xs, embs = [], []
         for k in range(self.num_layers + 1):
             logger.info(f"Calculating hop {k} hashes")
             node_hashings_table[k] = {
@@ -264,10 +263,9 @@ class ELPH(torch.nn.Module):
 
             logger.info(f'{k} hop hash generation ran in {time() - start} s')
 
-        # todo why am I returning None and what is going on here wiht embs?
-        if self.feature_prop == 'cat':
-            x, emb = self.cat_features(xs, embs)
-        return x, node_hashings_table, cards, None
+        # if self.feature_prop == 'cat':
+        #     x, emb = self.cat_features(xs, embs)
+        return x, node_hashings_table, cards
 
 
 class BUDDY(torch.nn.Module):

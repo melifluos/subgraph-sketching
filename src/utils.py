@@ -4,6 +4,7 @@ utility functions and global variables
 
 import os
 from distutils.util import strtobool
+from math import inf
 
 import torch
 import numpy as np
@@ -20,7 +21,7 @@ DEFAULT_DIC = {'sample_size': None, 'dataset_name': 'Cora', 'num_hops': 2, 'max_
                'val_citation_sample_size': None, 'wandb': False, 'batch_size': 32, 'num_workers': 1,
                'cache_train_structure_features': False, 'cache_val_structure_features': False,
                'cache_test_structure_features': False,
-               'citation_sample_size': None, 'eval_batch_size': 1000, 'bulk_train': False, 'num_negs': 1}
+               'citation_sample_size': None, 'eval_batch_size': 1000, 'num_negs': 1}
 
 
 def print_model_params(model):
@@ -31,9 +32,23 @@ def print_model_params(model):
             print(param.data.shape)
 
 
+def get_num_samples(sample_arg, dataset_len):
+    """
+    convert a sample arg that can be a number of % into a number of samples
+    :param sample_arg: float interpreted as % if < 1 or count if >= 1
+    :param dataset_len: the number of data points before sampling
+    :return:
+    """
+    if sample_arg < 1:
+        samples = int(sample_arg * dataset_len)
+    else:
+        samples = int(min(sample_arg, dataset_len))
+    return samples
+
+
 def select_embedding(args, num_nodes, device):
     """
-    select a node embedding. Used by SEAL models (the E is Embedding)
+    select a node embedding. Used by SEAL models (the E in SEAL is for Embedding)
     and needed for ogb-ddi where there are no node features
     :param args: Namespace of cmd args
     :param num_nodes: Int number of nodes to produce embeddings for

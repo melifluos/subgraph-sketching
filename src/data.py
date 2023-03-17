@@ -104,7 +104,7 @@ def get_data(args):
         split_edge = dataset.get_edge_split()
         if dataset_name == 'ogbl-collab' and args.year > 0:  # filter out training edges before args.year
             data, split_edge = filter_by_year(data, split_edge, args.year)
-        splits = get_ogb_data(data, split_edge, dataset_name, args.bulk_train, args.num_negs)
+        splits = get_ogb_data(data, split_edge, dataset_name, args.num_negs)
     else:  # make random splits
         transform = RandomLinkSplit(is_undirected=undirected, num_val=val_pct, num_test=test_pct,
                                     add_negative_train_samples=include_negatives)
@@ -136,7 +136,7 @@ def filter_by_year(data, split_edge, year):
     return data, split_edge
 
 
-def get_ogb_data(data, split_edge, dataset_name, bulk_train, num_negs=1):
+def get_ogb_data(data, split_edge, dataset_name, num_negs=1):
     """
     ogb datasets come with fixed train-val-test splits and a fixed set of negatives against which to evaluate the test set
     The dataset.data object contains all of the nodes, but only the training edges
@@ -144,21 +144,20 @@ def get_ogb_data(data, split_edge, dataset_name, bulk_train, num_negs=1):
     @param use_valedges_as_input:
     @return:
     """
-    if bulk_train:
-        if num_negs == 1:
-            negs_name = f'{ROOT_DIR}/dataset/{dataset_name}/negative_samples.pt'
-        else:
-            negs_name = f'{ROOT_DIR}/dataset/{dataset_name}/negative_samples_{num_negs}.pt'
-        print(f'looking for negative edges at {negs_name}')
-        if os.path.exists(negs_name):
-            print('loading negatives from disk')
-            train_negs = torch.load(negs_name)
-        else:
-            print('negatives not found on disk. Generating negatives')
-            train_negs = get_ogb_train_negs(split_edge, data.edge_index, data.num_nodes, num_negs, dataset_name)
-            torch.save(train_negs, negs_name)
+    if num_negs == 1:
+        negs_name = f'{ROOT_DIR}/dataset/{dataset_name}/negative_samples.pt'
     else:
+        negs_name = f'{ROOT_DIR}/dataset/{dataset_name}/negative_samples_{num_negs}.pt'
+    print(f'looking for negative edges at {negs_name}')
+    if os.path.exists(negs_name):
+        print('loading negatives from disk')
+        train_negs = torch.load(negs_name)
+    else:
+        print('negatives not found on disk. Generating negatives')
         train_negs = get_ogb_train_negs(split_edge, data.edge_index, data.num_nodes, num_negs, dataset_name)
+        torch.save(train_negs, negs_name)
+    # else:
+    #     train_negs = get_ogb_train_negs(split_edge, data.edge_index, data.num_nodes, num_negs, dataset_name)
     splits = {}
     for key in split_edge.keys():
         # the ogb datasets come with test and valid negatives, but you have to cook your own train negs

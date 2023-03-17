@@ -15,18 +15,19 @@ from tqdm import tqdm
 import torch
 import scipy.sparse as ssp
 # from datasketch import MinHash, HyperLogLogPlusPlus
-# import networkx as nx
 from torch_scatter import scatter_min
 
-from runners.train import train_gnn
-from runners.inference import get_gnn_preds
+from runners.train import train_elph
+from runners.inference import get_buddy_preds
 from test_params import OPT, setup_seed
 from models.elph import BUDDY, LinkPredictor
 from utils import ROOT_DIR, select_embedding
 from datasets.elph import HashedDynamicDataset
 from hashing import ElphHashes
+from runners.run import run
 
-class ELPHTests(unittest.TestCase):
+
+class BUDDYTests(unittest.TestCase):
     def setUp(self):
         self.n_nodes = 30
         degree = 5
@@ -50,6 +51,7 @@ class ELPHTests(unittest.TestCase):
         sgf = torch.rand((self.n_nodes, hash_hops * (hash_hops + 2)))
         gnn = BUDDY(args, num_features=num_features)
         x = gnn(sgf, self.x)
+        # todo finish tests
 
     def test_feature_forward(self):
         pass
@@ -57,7 +59,11 @@ class ELPHTests(unittest.TestCase):
     def test_embedding_forward(self):
         pass
 
-
-
     def test_forward(self):
         pass
+
+    def test_run(self):
+        # no exceptions is a pass
+        self.args.epochs = 1
+        self.args.dataset_name = 'Cora'
+        run(self.args)

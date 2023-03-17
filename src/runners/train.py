@@ -11,15 +11,20 @@ from tqdm import tqdm
 import wandb
 import numpy as np
 
+from utils import get_num_samples
+
 
 def get_train_func(args):
     if args.model == 'ELPH':
-        return train_gnn
-    train_func = bulk_train if args.bulk_train else train
+        return train_elph
+    elif args.model == 'BUDDY':
+        train_func = train_buddy
+    else:
+        train_func = train
     return train_func
 
 
-def bulk_train(model, optimizer, train_loader, args, device, emb=None):
+def train_buddy(model, optimizer, train_loader, args, device, emb=None):
     print('starting training')
     t0 = time.time()
     model.train()
@@ -29,16 +34,10 @@ def bulk_train(model, optimizer, train_loader, args, device, emb=None):
     links = data.links
     labels = torch.tensor(data.labels)
     # sampling
-    if args.train_samples <= 1:
-        train_samples = int(args.train_samples * len(labels))
-    elif args.train_samples != inf:
-        train_samples = int(args.train_samples)
-    else:
-        train_samples = len(labels)
-    if train_samples != inf:
-        sample_indices = torch.randperm(len(labels))[:train_samples]
-        links = links[sample_indices]
-        labels = labels[sample_indices]
+    train_samples = get_num_samples(args.train_samples, len(labels))
+    sample_indices = torch.randperm(len(labels))[:train_samples]
+    links = links[sample_indices]
+    labels = labels[sample_indices]
 
     if args.wandb:
         wandb.log({"train_total_batches": len(train_loader)})
@@ -93,20 +92,26 @@ def bulk_train(model, optimizer, train_loader, args, device, emb=None):
 
 
 def train(model, optimizer, train_loader, args, device, emb=None):
+    """
+    Adapted version of the SEAL training function
+    :param model:
+    :param optimizer:
+    :param train_loader:
+    :param args:
+    :param device:
+    :param emb:
+    :return:
+    """
+
     print('starting training')
     t0 = time.time()
     model.train()
     if args.dynamic_train:
-        if args.train_samples <= 1:
-            train_samples = len(train_loader.dataset) * args.train_samples
-        else:
-            train_samples = args.train_samples
+        train_samples = get_num_samples(args.train_samples, len(train_loader.dataset))
     else:
         train_samples = inf
     total_loss = 0
-    # todo worry about when there are a different number of negative edges
     pbar = tqdm(train_loader, ncols=70)
-    # todo currently samples the train / val / test edges only once instead of taking a different sample at each epoch
     if args.wandb:
         wandb.log({"train_total_batches": len(train_loader)})
     batch_processing_times = []
@@ -153,7 +158,7 @@ def train(model, optimizer, train_loader, args, device, emb=None):
     return total_loss / len(train_loader.dataset)
 
 
-def train_gnn(model, optimizer, train_loader, args, device):
+def train_elph(model, optimizer, train_loader, args, device):
     """
     train a GNN that calculates hashes using message passing
     @param model:
@@ -172,16 +177,10 @@ def train_gnn(model, optimizer, train_loader, args, device):
     links = data.links
     labels = torch.tensor(data.labels)
     # sampling
-    if args.train_samples <= 1:
-        train_samples = int(args.train_samples * len(labels))
-    elif args.train_samples != inf:
-        train_samples = int(args.train_samples)
-    else:
-        train_samples = len(labels)
-    if train_samples != inf:
-        sample_indices = torch.randperm(len(labels))[:train_samples]
-        links = links[sample_indices]
-        labels = labels[sample_indices]
+    train_samples = get_num_samples(args.train_samples, len(labels))
+    sample_indices = torch.randperm(len(labels))[:train_samples]
+    links = links[sample_indices]
+    labels = labels[sample_indices]
 
     if args.wandb:
         wandb.log({"train_total_batches": len(train_loader)})
@@ -197,7 +196,7 @@ def train_gnn(model, optimizer, train_loader, args, device):
         else:
             emb = None
         # get node features
-        node_features, hashes, cards, _ = model(data.x.to(device), data.edge_index.to(device))
+        node_features, hashes, cards = model(data.x.to(device), data.edge_index.to(device))
         curr_links = links[indices].to(device)
         batch_node_features = None if node_features is None else node_features[curr_links]
         batch_emb = None if emb is None else emb[curr_links].to(device)

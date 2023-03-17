@@ -10,20 +10,16 @@ from tqdm import tqdm
 import wandb
 
 from evaluation import evaluate_auc, evaluate_hits, evaluate_mrr
+from utils import get_num_samples
 
 
 def get_test_func(args, split):
     if args.model == 'ELPH':
-        return get_gnn_preds
-    if split == 'train':
-        test_func = get_bulk_preds if args.bulk_train else get_preds
-    elif split in {'val', 'valid'}:
-        test_func = get_bulk_preds if args.bulk_val else get_preds
-    elif split == 'test':
-        test_func = get_bulk_preds if args.bulk_test else get_preds
+        return get_elph_preds
+    elif args.model == 'BUDDY':
+        return get_buddy_preds
     else:
-        raise NotImplementedError(f'no {split} split implemented')
-    return test_func
+        return get_preds
 
 
 @torch.no_grad()
@@ -63,13 +59,13 @@ def test(model, evaluator, train_loader, val_loader, test_loader, args, device, 
 
 
 @torch.no_grad()
-def get_preds(model, loader, device, args, emb=None, sample_size=inf, split=None):
-    # todo get rid of sample_size param, which isn't used
-    sample_arg = get_sample_arg(split, args)
-    if sample_arg <= 1:
-        samples = len(loader.dataset) * sample_arg
-    else:
-        samples = sample_arg
+def get_preds(model, loader, device, args, emb=None, split=None):
+    # sample_arg = get_sample_arg(split, args)
+    # if sample_arg <= 1:
+    #     samples = len(loader.dataset) * sample_arg
+    # else:
+    #     samples = sample_arg
+    samples = get_split_samples(split, args, len(loader.dataset))
     y_pred, y_true = [], []
     pbar = tqdm(loader, ncols=70)
     if args.wandb:
@@ -105,13 +101,13 @@ def get_preds(model, loader, device, args, emb=None, sample_size=inf, split=None
     pred, true = torch.cat(y_pred), torch.cat(y_true)
     pos_pred = pred[true == 1]
     neg_pred = pred[true == 0]
-    samples_used = len(loader.dataset) if sample_size > len(loader.dataset) else sample_size
+    samples_used = len(loader.dataset) if samples > len(loader.dataset) else samples
     print(f'{len(pos_pred)} positives and {len(neg_pred)} negatives for sample of {samples_used} edges')
     return pos_pred, neg_pred, pred, true
 
 
 @torch.no_grad()
-def get_bulk_preds(model, loader, device, args, sample_size=inf, split=None):
+def get_buddy_preds(model, loader, device, args, sample_size=inf, split=None):
     t0 = time.time()
     preds = []
     data = loader.dataset
@@ -154,28 +150,38 @@ def get_bulk_preds(model, loader, device, args, sample_size=inf, split=None):
     return pos_pred, neg_pred, pred, labels
 
 
-def get_sample_arg(split, args):
+def get_split_samples(split, args, dataset_len):
+    """
+    get the
+    :param split: train, val, test
+    :param args: Namespace object
+    :param dataset_len: total size of dataset
+    :return:
+    """
     if split == 'train':
         if args.dynamic_train:
-            return args.train_samples
-        else:
-            return inf
+            samples = get_num_samples(args.train_samples, dataset_len)
+        #     return args.train_samples
+        # else:
+        #     return inf
     elif split in {'val', 'valid'}:
         if args.dynamic_val:
-            return args.val_samples
-        else:
-            return inf
+            samples = get_num_samples(args.val_samples, dataset_len)
+        # else:
+        #     return inf
     elif split == 'test':
         if args.dynamic_test:
-            return args.test_samples
-        else:
-            return inf
+            samples = get_num_samples(args.test_samples, dataset_len)
+        #     return args.test_samples
+        # else:
+        #     return inf
     else:
         raise NotImplementedError(f'split: {split} is not a valid split')
+    return samples
 
 
 @torch.no_grad()
-def get_gnn_preds(model, loader, device, args, sample_size=inf, split=None):
+def get_elph_preds(model, loader, device, args, sample_size=inf, split=None):
     t0 = time.time()
     preds = []
     data = loader.dataset
@@ -192,7 +198,7 @@ def get_gnn_preds(model, loader, device, args, sample_size=inf, split=None):
             emb = model.node_embedding.weight
     else:
         emb = None
-    node_features, hashes, cards, _ = model(data.x.to(device), data.edge_index.to(device))
+    node_features, hashes, cards = model(data.x.to(device), data.edge_index.to(device))
     for batch_count, indices in enumerate(tqdm(loader)):
         curr_links = links[indices].to(device)
         batch_emb = None if emb is None else emb[curr_links].to(device)
