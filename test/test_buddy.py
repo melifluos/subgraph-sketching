@@ -46,13 +46,17 @@ class BUDDYTests(unittest.TestCase):
         setup_seed(0)
 
     def test_propagate(self):
+        batch_size = 10
         num_features = self.x.shape[1]
         hash_hops = 2
         args = self.args
+        args.sign_k = 0
         args.max_hash_hops = hash_hops
-        sgf = torch.rand((self.n_nodes, hash_hops * (hash_hops + 2)))
+        sgf = torch.rand((batch_size, hash_hops * (hash_hops + 2)))
         gnn = BUDDY(args, num_features=num_features)
-        x = gnn(sgf, self.x)
+        x = torch.rand((batch_size, 2, self.num_features))
+        x = gnn(sgf, x)
+        self.assertTrue(len(x) == batch_size)
         # todo finish tests
 
     def test_degrees(self):

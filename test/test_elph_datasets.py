@@ -35,8 +35,6 @@ class ELPHDatasetTests(unittest.TestCase):
 
     def test_HashedDynamicDataset(self):
         torch.manual_seed(0)
-        # pos_edges = torch.randint(self.n_nodes, (self.n_edges, 2))
-        # neg_edges = torch.randint(self.n_nodes, (self.n_edges, 2))
         self.args.model = 'BUDDY'
         split = 'test'
         ei = self.edge_index
@@ -57,7 +55,7 @@ class ELPHDatasetTests(unittest.TestCase):
         structure_features = eh.get_subgraph_features(all_edges, hashes, cards)
         # construct features implicitly (hopefully) using the same hashes and cards
         hdd = HashedDynamicDataset(root, split, data, self.pos_edges, self.neg_edges, self.args, use_coalesce=False,
-                                   directed=False, load_features=True, cache_structure_features=True)
+                                   directed=False, cache_structure_features=False)
         self.assertTrue(hdd.links.shape == (2 * self.n_edges, 2))
         self.assertTrue(len(hdd.labels) == 2 * self.n_edges)
         self.assertTrue(len(hdd.edge_weight) == self.edge_index.shape[1])

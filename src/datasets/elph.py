@@ -170,14 +170,12 @@ class HashedDynamicDataset(Dataset):
                 retval = f'{self.root}_{self.split}_structure_featurecache.pt'
         return retval
 
-    def _preprocess_subgraph_features(self, device, num_nodes, num_negs=1):
+    def _generate_file_names(self, num_negs):
         """
-        Handles caching of hashes and or full structure features where each edge is fully hydrated as a preprocessing step
-        Will either set self.hashes, self.structure_features depending on cmd args
-        @return:
+        get the subgraph feature file name and the stubs needed to make a new one if necessary
+        :param num_negs: Int negative samples / positive sample
+        :return:
         """
-        # If cache structure features was set to True then look for them
-        # If we find them, we don't need the hashes
         if self.max_hash_hops != 2:
             hop_str = f'{self.max_hash_hops}hop_'
         else:
@@ -188,12 +186,24 @@ class HashedDynamicDataset(Dataset):
         else:
             year_str = ''
         if num_negs == 1 or self.split != 'train':
-            structure_cache_name = f'{self.root}_{self.split}{year_str}{end_str}'
+            structure_cache_name = f'{self.root}{self.split}{year_str}{end_str}'
         else:
-            structure_cache_name = f'{self.root}_{self.split}_negs{num_negs}{year_str}{end_str}'
-        found_subgraph_feautures = self._read_subgraph_features(structure_cache_name, device)
-        if not found_subgraph_feautures:
-            print(f'no structure features found at {structure_cache_name}. Need to generate them')
+            structure_cache_name = f'{self.root}{self.split}_negs{num_negs}{year_str}{end_str}'
+        return structure_cache_name, year_str, hop_str
+
+
+    def _preprocess_subgraph_features(self, device, num_nodes, num_negs=1):
+        """
+        Handles caching of hashes and subgraph features where each edge is fully hydrated as a preprocessing step
+        Sets self.structure_features
+        @return:
+        """
+        structure_cache_name, year_str, hop_str = self._generate_file_names(num_negs)
+        found_subgraph_features = self._read_subgraph_features(structure_cache_name, device)
+        if not found_subgraph_features:
+            if self.cache_structure_features:
+                print(f'no subgraph features found at {structure_cache_name}')
+            print('generating subgraph features')
             hash_name = f'{self.root}{self.split}{year_str}_{hop_str}hashcache.pt'
             cards_name = f'{self.root}{self.split}{year_str}_{hop_str}cardcache.pt'
             if self.load_hashes and os.path.exists(hash_name):
@@ -205,26 +215,34 @@ class HashedDynamicDataset(Dataset):
                 else:
                     print(f'hashes found at {hash_name}, but cards not found. Delete hashes and run again')
             else:
-                print('constructing hashes')
+                print('no hashes found on disk, constructing hashes...')
                 start_time = time()
                 hashes, cards = self.elph_hashes.build_hash_tables(num_nodes, self.edge_index)
                 print("Preprocessed hashes in: {:.2f} seconds".format(time() - start_time))
                 if self.load_hashes:
                     torch.save(cards, cards_name)
                     torch.save(hashes, hash_name)
-
-            if self.cache_structure_features and self.structure_features is None:
-                # now we have the hashes we can make the structure features
-                print('constructing structure features')
-                start_time = time()
-                self.structure_features = self.elph_hashes.get_subgraph_features(self.links, hashes, cards)
-                print("Preprocessed structure features in: {:.2f} seconds".format(time() - start_time))
-                assert self.structure_features.shape[0] == len(
-                    self.links), 'structure features are a different shape link object. Delete structure features file and regenerate'
+            print('constructing structure features')
+            start_time = time()
+            self.structure_features = self.elph_hashes.get_subgraph_features(self.links, hashes, cards)
+            print("Preprocessed structure features in: {:.2f} seconds".format(time() - start_time))
+            assert self.structure_features.shape[0] == len(
+                self.links), 'structure features are a different shape link object. Delete structure features file and regenerate'
+            if self.cache_structure_features:
                 torch.save(self.structure_features, structure_cache_name)
-            else:  # we need the hashes if we're not storing the structure features or using the database
-                self.hashes = hashes
-                self.cards = cards
+
+            # if self.cache_structure_features and self.structure_features is None:
+            #     # now we have the hashes we can make the structure features
+            #     print('constructing structure features')
+            #     start_time = time()
+            #     self.structure_features = self.elph_hashes.get_subgraph_features(self.links, hashes, cards)
+            #     print("Preprocessed structure features in: {:.2f} seconds".format(time() - start_time))
+            #     assert self.structure_features.shape[0] == len(
+            #         self.links), 'structure features are a different shape link object. Delete structure features file and regenerate'
+            #     torch.save(self.structure_features, structure_cache_name)
+            # else:  # we need the hashes if we're not storing the structure features or using the database
+            #     self.hashes = hashes
+            #     self.cards = cards
         if self.args.floor_sf and self.structure_features is not None:
             self.structure_features[self.structure_features < 0] = 0
             print(
@@ -241,17 +259,18 @@ class HashedDynamicDataset(Dataset):
     def get(self, idx):
         src, dst = self.links[idx]
         if self.args.use_struct_feature:
-            if self.cache_structure_features:
-                try:
-                    structure_features = self.structure_features[idx]
-                except TypeError:  # structure features are only cached in te
-                    structure_features = self.elph_hashes.get_subgraph_features(self.links[idx], self.hashes,
-                                                                                self.cards)
-            else:
-                structure_features = self.elph_hashes.get_subgraph_features(self.links[idx], self.hashes,
-                                                                            self.cards)
+            structure_features = self.structure_features[idx]
+            # if self.cache_structure_features:
+            #     try:
+            #         structure_features = self.structure_features[idx]
+            #     except TypeError:  # structure features are only cached in te
+            #         structure_features = self.elph_hashes.get_subgraph_features(self.links[idx], self.hashes,
+            #                                                                     self.cards)
+            # else:
+            #     structure_features = self.elph_hashes.get_subgraph_features(self.links[idx], self.hashes,
+            #                                                                 self.cards)
         else:
-            structure_features = torch.zeros(8)
+            structure_features = torch.zeros(self.max_hash_hops * (2 + self.max_hash_hops))
 
         y = self.labels[idx]
         if self.use_RA:
