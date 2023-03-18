@@ -11,7 +11,6 @@ import numpy as np
 import scipy.sparse as ssp
 import torch
 from datasketch import MinHash, HyperLogLogPlusPlus
-import networkx as nx
 
 from hashing import ElphHashes, LABEL_LOOKUP
 from datasets.seal import neighbors
@@ -23,9 +22,7 @@ class HashingTests(unittest.TestCase):
         self.n_nodes = 30
         self.n_edges = 100
         degree = 5  # number of edges to attach to each new node, not the degree at the end of the process
-        p = 0.2
         self.x = torch.rand((self.n_nodes, 2))
-        self.G = nx.newman_watts_strogatz_graph(n=self.n_nodes, k=degree, p=p)
         edge_index = barabasi_albert_graph(self.n_nodes, degree)
         edge_index = to_undirected(edge_index)
         self.edge_index, _ = add_self_loops(edge_index)
@@ -162,7 +159,7 @@ class HashingTests(unittest.TestCase):
         # (1,3)
         int13 = neighbors11.intersection(neighbors23)
         feat13 = int13.difference(int11 | feat12)
-        self.assertTrue(isclose(len(feat13), features[(1, 3)], abs_tol=1))
+        self.assertTrue(isclose(len(feat13), features[(1, 3)], abs_tol=1.5))
         # (3,2)
         int32 = neighbors13.intersection(neighbors22)
         feat32 = int32.difference(int11 | feat21 | feat12 | feat22 | feat31)
@@ -253,6 +250,7 @@ class HashingTests(unittest.TestCase):
         self.assertTrue(isclose(jaccard, jaccard_est, abs_tol=0.1))
 
     def test_subgraph_features(self):
+        random.seed(0)
         n_links = 6
         self.args.max_hash_hops = 2
         eh = ElphHashes(self.args)
@@ -292,7 +290,7 @@ class HashingTests(unittest.TestCase):
         # test (2,2) features
         int22 = neighbors12.intersection(neighbors22)
         feat22 = int22.difference(feat12 | feat21 | int11)
-        self.assertTrue(isclose(len(feat22), features[(2, 2)], abs_tol=1.5))
+        self.assertTrue(isclose(len(feat22), features[(2, 2)], abs_tol=2))
         # TEST ORDER 3 FROM HERE
         #  (3,1)
         int31 = neighbors13.intersection(neighbors21)

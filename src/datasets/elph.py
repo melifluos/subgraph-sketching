@@ -152,24 +152,6 @@ class HashedDynamicDataset(Dataset):
             retval = True
         return retval
 
-    def get_structure_feature_cache_name(self):
-        if self.split == 'test':
-            if self.args.test_samples != inf:
-                retval = f'{self.root}_{self.split}_{self.args.test_samples}_structure_featurecache.pt'
-            else:
-                retval = f'{self.root}_{self.split}_structure_featurecache.pt'
-        elif self.split == 'valid':
-            if self.args.val_samples != inf:
-                retval = f'{self.root}_{self.split}_{self.args.val_samples}_structure_featurecache.pt'
-            else:
-                retval = f'{self.root}_{self.split}_structure_featurecache.pt'
-        elif self.split == 'train':
-            if self.args.train_samples != inf:
-                retval = f'{self.root}_{self.split}_{self.args.train_samples}_structure_featurecache.pt'
-            else:
-                retval = f'{self.root}_{self.split}_structure_featurecache.pt'
-        return retval
-
     def _generate_file_names(self, num_negs):
         """
         get the subgraph feature file name and the stubs needed to make a new one if necessary
@@ -186,11 +168,10 @@ class HashedDynamicDataset(Dataset):
         else:
             year_str = ''
         if num_negs == 1 or self.split != 'train':
-            structure_cache_name = f'{self.root}{self.split}{year_str}{end_str}'
+            subgraph_cache_name = f'{self.root}{self.split}{year_str}{end_str}'
         else:
-            structure_cache_name = f'{self.root}{self.split}_negs{num_negs}{year_str}{end_str}'
-        return structure_cache_name, year_str, hop_str
-
+            subgraph_cache_name = f'{self.root}{self.split}_negs{num_negs}{year_str}{end_str}'
+        return subgraph_cache_name, year_str, hop_str
 
     def _preprocess_subgraph_features(self, device, num_nodes, num_negs=1):
         """
@@ -230,19 +211,6 @@ class HashedDynamicDataset(Dataset):
                 self.links), 'structure features are a different shape link object. Delete structure features file and regenerate'
             if self.cache_structure_features:
                 torch.save(self.structure_features, structure_cache_name)
-
-            # if self.cache_structure_features and self.structure_features is None:
-            #     # now we have the hashes we can make the structure features
-            #     print('constructing structure features')
-            #     start_time = time()
-            #     self.structure_features = self.elph_hashes.get_subgraph_features(self.links, hashes, cards)
-            #     print("Preprocessed structure features in: {:.2f} seconds".format(time() - start_time))
-            #     assert self.structure_features.shape[0] == len(
-            #         self.links), 'structure features are a different shape link object. Delete structure features file and regenerate'
-            #     torch.save(self.structure_features, structure_cache_name)
-            # else:  # we need the hashes if we're not storing the structure features or using the database
-            #     self.hashes = hashes
-            #     self.cards = cards
         if self.args.floor_sf and self.structure_features is not None:
             self.structure_features[self.structure_features < 0] = 0
             print(
