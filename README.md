@@ -42,7 +42,7 @@ if you are unfamiliar with wandb, quickstart instructions are
 For example to run ELPH for Cora with random splits:
 ```
 cd src
-python run.py --dataset Cora --model ELPH
+python runners/run.py --dataset Cora --model ELPH
 ```
 
 ### Dataset and Preprocessing
