@@ -148,6 +148,7 @@ def get_split_samples(split, args, dataset_len):
     :param dataset_len: total size of dataset
     :return:
     """
+    samples = dataset_len
     if split == 'train':
         if args.dynamic_train:
             samples = get_num_samples(args.train_samples, dataset_len)
