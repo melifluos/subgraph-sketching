@@ -38,10 +38,10 @@ class SIGNTests(unittest.TestCase):
         root = ('.')
         data = Data(torch.rand(self.n_nodes, n_features), self.edge_index, self.edge_weight)
         elph_dataset = HashedDynamicDataset(root, split, data, self.test_edges, self.neg_test_edges, args)
-        x = elph_dataset.generate_sign_features(data, self.edge_index, self.edge_weight, sign_k)
+        x = elph_dataset._generate_sign_features(data, self.edge_index, self.edge_weight, sign_k)
         self.assertTrue(x.shape == (self.n_nodes, n_features * (sign_k + 1)))
         sign_k = 0
-        x = elph_dataset.generate_sign_features(data, self.edge_index, self.edge_weight, sign_k)
+        x = elph_dataset._generate_sign_features(data, self.edge_index, self.edge_weight, sign_k)
         self.assertTrue(x.shape == data.x.shape)
 
     def test_sign_forward(self):

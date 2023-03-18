@@ -109,7 +109,6 @@ class ELPHTests(unittest.TestCase):
         pos_edges = torch.randint(self.n_nodes, (n_links, 2))
         neg_edges = torch.randint(self.n_nodes, (n_links, 2))
         hdd = HashedDynamicDataset(root, split, data, pos_edges, neg_edges, args, use_coalesce=False, directed=False,
-                                   load_features=False, load_hashes=False, use_zero_one=True,
                                    cache_structure_features=False)
         dl = DataLoader(hdd, batch_size=1,
                         shuffle=False, num_workers=1)
@@ -157,10 +156,8 @@ class ELPHTests(unittest.TestCase):
         pos_edges = torch.randint(self.n_nodes, (n_links, 2))
         neg_edges = torch.randint(self.n_nodes, (n_links, 2))
         hdd = HashedDynamicDataset(root, split, data, pos_edges, neg_edges, args, use_coalesce=False, directed=False,
-                                   load_features=False, load_hashes=False, use_zero_one=True,
                                    cache_structure_features=False)
-        dl = DataLoader(hdd, batch_size=1,
-                        shuffle=False, num_workers=1)
+        dl = DataLoader(hdd, batch_size=1, shuffle=False, num_workers=1)
         pos_pred, neg_pred, pred, labels = get_elph_preds(gnn, dl, self.x.device, args, split='test')
         self.assertTrue(len(pos_pred == len(pos_edges)))
         self.assertTrue(len(neg_pred == len(neg_edges)))

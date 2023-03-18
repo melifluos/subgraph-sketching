@@ -80,12 +80,12 @@ class HashedDynamicDataset(Dataset):
         if args.model == 'ELPH':  # features propagated in the model instead of preprocessed
             self.x = data.x
         else:
-            self.x = self.preprocess_features(data, self.edge_index, self.edge_weight, args.sign_k)
+            self.x = self._preprocess_node_features(data, self.edge_index, self.edge_weight, args.sign_k)
         if args.model != 'ELPH':  # ELPH does hashing and feature prop on the fly
             # either set self.hashes or self.structure_features depending on cmd args
-            self.preprocess_structure_features(self.edge_index.device, data.num_nodes, args.num_negs)
+            self._preprocess_subgraph_features(self.edge_index.device, data.num_nodes, args.num_negs)
 
-    def generate_sign_features(self, data, edge_index, edge_weight, sign_k):
+    def _generate_sign_features(self, data, edge_index, edge_weight, sign_k):
         """
         Generate features by preprocessing using the Scalable Inception Graph Neural Networks (SIGN) method
          https://arxiv.org/abs/2004.11198
@@ -110,12 +110,13 @@ class HashedDynamicDataset(Dataset):
             xs = torch.cat(xs, dim=-1)
         return xs
 
-    def preprocess_features(self, data, edge_index, edge_weight, sign_k=0):
+    def _preprocess_node_features(self, data, edge_index, edge_weight, sign_k=0):
         """
         preprocess the node features
-        @param data:
-        @param edge_weight:
-        @return:
+        @param data: pyg Data object
+        @param edge_weight: pyg edge index Int Tensor [edges, 2]
+        @param sign_k: the number of propagation steps used by SIGN
+        @return: Float Tensor [num_nodes, hidden_dim]
         """
         if sign_k == 0:
             feature_name = f'{self.root}_{self.split}_featurecache.pt'
@@ -127,15 +128,15 @@ class HashedDynamicDataset(Dataset):
         else:
             print('constructing node features')
             start_time = time()
-            x = self.generate_sign_features(data, edge_index, edge_weight, sign_k)
+            x = self._generate_sign_features(data, edge_index, edge_weight, sign_k)
             print("Preprocessed features in: {:.2f} seconds".format(time() - start_time))
             if self.load_features:
                 torch.save(x.cpu(), feature_name)
         return x
 
-    def read_structure_features(self, name, device):
+    def _read_subgraph_features(self, name, device):
         """
-        return True if the structure features can be read off disk, otherwise returns False
+        return True if the subgraph features can be read off disk, otherwise returns False
         @param name:
         @param device:
         @return:
@@ -143,11 +144,11 @@ class HashedDynamicDataset(Dataset):
         retval = False
         # look on disk
         if self.cache_structure_features and os.path.exists(name):
-            print(f'looking for structure features in {name}')
+            print(f'looking for subgraph features in {name}')
             self.structure_features = torch.load(name).to(device)
-            print(f"cached structure features found at: {name}")
+            print(f"cached subgraph features found at: {name}")
             assert self.structure_features.shape[0] == len(
-                self.links), 'structure features are a different shape link object. Delete structure features file and regenerate'
+                self.links), 'subgraph features are inconsistent with the link object. Delete structure features file and regenerate'
             retval = True
         return retval
 
@@ -169,10 +170,10 @@ class HashedDynamicDataset(Dataset):
                 retval = f'{self.root}_{self.split}_structure_featurecache.pt'
         return retval
 
-    def preprocess_structure_features(self, device, num_nodes, num_negs=1):
+    def _preprocess_subgraph_features(self, device, num_nodes, num_negs=1):
         """
         Handles caching of hashes and or full structure features where each edge is fully hydrated as a preprocessing step
-        Will either set self.hashes, self.structure_features or self.hashdb depending on cmd args
+        Will either set self.hashes, self.structure_features depending on cmd args
         @return:
         """
         # If cache structure features was set to True then look for them
@@ -190,18 +191,19 @@ class HashedDynamicDataset(Dataset):
             structure_cache_name = f'{self.root}_{self.split}{year_str}{end_str}'
         else:
             structure_cache_name = f'{self.root}_{self.split}_negs{num_negs}{year_str}{end_str}'
-        if not self.read_structure_features(structure_cache_name, device):
+        found_subgraph_feautures = self._read_subgraph_features(structure_cache_name, device)
+        if not found_subgraph_feautures:
             print(f'no structure features found at {structure_cache_name}. Need to generate them')
             hash_name = f'{self.root}{self.split}{year_str}_{hop_str}hashcache.pt'
             cards_name = f'{self.root}{self.split}{year_str}_{hop_str}cardcache.pt'
             if self.load_hashes and os.path.exists(hash_name):
                 print('loading hashes from disk')
                 hashes = torch.load(hash_name)
-                if self.load_hashes and os.path.exists(cards_name):
+                if os.path.exists(cards_name):
                     print('loading cards from disk')
                     cards = torch.load(cards_name)
                 else:
-                    print(f'hashes found at {hash_name}, but cards not cached. Delete hashes and run again')
+                    print(f'hashes found at {hash_name}, but cards not found. Delete hashes and run again')
             else:
                 print('constructing hashes')
                 start_time = time()
@@ -232,13 +234,6 @@ class HashedDynamicDataset(Dataset):
                 self.structure_features[:, [4, 5]] = 0
             if self.max_hash_hops == 3:
                 self.structure_features[:, [11, 12]] = 0  # also need to get rid of (0, 2) and (2, 0)
-
-    def sample_links(self, sample_size):
-        neg_edges = self.neg_edges.view(self.pos_edges.size(0), -1, 2)
-        perm = torch.randperm(self.pos_edges.size(0))
-        idx = perm[:sample_size]
-        self.pos_edges = self.pos_edges[idx]
-        self.neg_edges = neg_edges[idx].reshape(-1, 2)
 
     def len(self):
         return len(self.links)
