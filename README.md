@@ -39,10 +39,10 @@ if you are unfamiliar with wandb, quickstart instructions are
 
 
 ### Experiments
-For example to run for Cora with random splits:
+For example to run ELPH for Cora with random splits:
 ```
 cd src
-python run.py --dataset Cora 
+python run.py --dataset Cora --model ELPH
 ```
 
 ### Dataset and Preprocessing
