@@ -82,7 +82,7 @@ class HashedDynamicDataset(Dataset):
         else:
             self.x = self.preprocess_features(data, self.edge_index, self.edge_weight, args.sign_k)
         if args.model != 'ELPH':  # ELPH does hashing and feature prop on the fly
-            # either set self.hashes, self.structure_features depending on cmd args
+            # either set self.hashes or self.structure_features depending on cmd args
             self.preprocess_structure_features(self.edge_index.device, data.num_nodes, args.num_negs)
 
     def generate_sign_features(self, data, edge_index, edge_weight, sign_k):
@@ -192,8 +192,8 @@ class HashedDynamicDataset(Dataset):
             structure_cache_name = f'{self.root}_{self.split}_negs{num_negs}{year_str}{end_str}'
         if not self.read_structure_features(structure_cache_name, device):
             print(f'no structure features found at {structure_cache_name}. Need to generate them')
-            hash_name = f'{self.root}_{self.split}{year_str}_{hop_str}hashcache.pt'
-            cards_name = f'{self.root}_{self.split}{year_str}_{hop_str}cardcache.pt'
+            hash_name = f'{self.root}{self.split}{year_str}_{hop_str}hashcache.pt'
+            cards_name = f'{self.root}{self.split}{year_str}_{hop_str}cardcache.pt'
             if self.load_hashes and os.path.exists(hash_name):
                 print('loading hashes from disk')
                 hashes = torch.load(hash_name)
@@ -270,7 +270,7 @@ class HashedDynamicDataset(Dataset):
 
 
 def get_hashed_train_val_test_datasets(dataset, train_data, val_data, test_data, args, directed=False):
-    root = f'{dataset.root}_elph_'
+    root = f'{dataset.root}/elph_'
     print(f'data path: {root}')
     use_coalesce = True if args.dataset_name == 'ogbl-collab' else False
     pos_train_edge, neg_train_edge = get_pos_neg_edges(train_data)

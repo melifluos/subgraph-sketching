@@ -43,12 +43,11 @@ def run(args):
     for rep in range(args.reps):
         dataset, splits, directed, eval_metric = get_data(args)
         train_loader, train_eval_loader, val_loader, test_loader = get_loaders(args, dataset, splits, directed)
-        train_data, val_data, test_data = splits['train'], splits['valid'], splits['test']
         if args.dataset_name.startswith('ogbl'):  # then this is one of the ogb link prediction datasets
             evaluator = Evaluator(name=args.dataset_name)
         else:
             evaluator = Evaluator(name='ogbl-ppa')  # this sets HR@100 as the metric
-        emb = select_embedding(args, train_data.num_nodes, device)
+        emb = select_embedding(args, dataset.data.num_nodes, device)
         model, optimizer = select_model(args, dataset, emb, device)
         val_res = test_res = best_epoch = 0
         print(f'running repetition {rep}')

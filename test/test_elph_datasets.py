@@ -38,9 +38,9 @@ class ELPHDatasetTests(unittest.TestCase):
         split = 'test'
         ei = self.edge_index
         data = Data(self.x, ei)
-        root = f'{ROOT_DIR}/test/test_HashedDynamicDataset'
-        hash_name = f'{root}_{split}_hashcache.pt'
-        cards_name = f'{root}_{split}_cardcache.pt'
+        root = f'{ROOT_DIR}/test/dataset/test_HashedDynamicDataset'
+        hash_name = f'{root}{split}_hashcache.pt'
+        cards_name = f'{root}{split}_cardcache.pt'
         eh = ElphHashes(self.args)
         if os.path.exists(hash_name) and os.path.exists(cards_name):
             hashes = torch.load(hash_name)
@@ -50,13 +50,16 @@ class ELPHDatasetTests(unittest.TestCase):
             torch.save(hashes, hash_name)
             torch.save(cards, cards_name)
         all_edges = torch.cat([pos_edges, neg_edges], 0)
+        # construct features directly from hashes and cards
         structure_features = eh.get_subgraph_features(all_edges, hashes, cards)
+        # construct features implicitly (hopefully) using the same hashes and cards
         hdd = HashedDynamicDataset(root, split, data, pos_edges, neg_edges, self.args, use_coalesce=False,
                                    directed=False,
                                    load_features=True, load_hashes=True, use_zero_one=True,
                                    cache_structure_features=True)
         dl = DataLoader(hdd, batch_size=1,
                         shuffle=False, num_workers=1)
+        # check the dataset has the same features
         for sf, elem in zip(structure_features, dl):
             sf_test = elem[0]
             self.assertTrue(torch.all(torch.eq(sf, sf_test)))
@@ -71,7 +74,7 @@ class ELPHDatasetTests(unittest.TestCase):
         split = 'train'
         ei = self.edge_index
         data = Data(self.x, ei)
-        root = f'{ROOT_DIR}/test/test_HashedDynamicDataset'
+        root = f'{ROOT_DIR}/test/dataset/test_HashedDynamicDataset'
         hdd = HashedDynamicDataset(root, split, data, pos_edges, neg_edges, self.args, use_coalesce=False,
                                    directed=False,
                                    load_features=True, load_hashes=True, use_zero_one=True,
