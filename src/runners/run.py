@@ -5,33 +5,29 @@ import argparse
 import time
 import warnings
 from math import inf
+import sys
+
+sys.path.insert(0, '..')
 
 import numpy as np
 import torch
 from ogb.linkproppred import Evaluator
-from torch_geometric.loader import DataLoader as pygDataLoader
-from torch.utils.data import DataLoader
-from torch_sparse import SparseTensor
 
 torch.set_printoptions(precision=4)
 import wandb
 # when generating subgraphs the supervision edge is deleted, which triggers a SparseEfficiencyWarning, but this is
 # not a performance bottleneck, so suppress for now
 from scipy.sparse import SparseEfficiencyWarning
-from tqdm import tqdm
 
 warnings.filterwarnings("ignore", category=SparseEfficiencyWarning)
 
-from data import get_data, get_loaders
-from evaluation import evaluate_auc, evaluate_hits, evaluate_mrr
-from datasets.seal import get_train_val_test_datasets
-from datasets.elph import get_hashed_train_val_test_datasets, make_train_eval_data
-from models.elph import ELPH, BUDDY
-from models.seal import SEALDGCNN, SEALGCN, SEALGIN, SEALSAGE
-from utils import ROOT_DIR, print_model_params, select_embedding, str2bool
-from wandb_setup import initialise_wandb
-from runners.train import get_train_func
-from runners.inference import test
+from src.data import get_data, get_loaders
+from src.models.elph import ELPH, BUDDY
+from src.models.seal import SEALDGCNN, SEALGCN, SEALGIN, SEALSAGE
+from src.utils import ROOT_DIR, print_model_params, select_embedding, str2bool
+from src.wandb_setup import initialise_wandb
+from src.runners.train import get_train_func
+from src.runners.inference import test
 
 
 def run(args):

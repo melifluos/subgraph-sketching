@@ -6,20 +6,14 @@ from time import time
 import logging
 
 import torch
-from torch.nn import Linear, ModuleList, Sequential as Seq, ReLU
 import torch.nn.functional as F
-import wandb
-from torch_geometric.nn import global_add_pool, global_mean_pool
-from models.gnn import SIGN, SIGNEmbedding
-import torch_sparse
-from torch_geometric.nn import GCNConv, MessagePassing
-from hashing import MinhashPropagation, HllPropagation, ElphHashes
-from torch.nn import Linear, Parameter
+from torch.nn import Linear
+from torch_geometric.nn import GCNConv
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
 from torch_geometric.utils import add_self_loops
 
-from models.gnn import GCNCustomConv
-from labelling_tricks import get_drnl_lookup
+from src.models.gnn import SIGN, SIGNEmbedding
+from src.hashing import ElphHashes
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARN)

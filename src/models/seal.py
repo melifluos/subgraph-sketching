@@ -16,7 +16,7 @@ import torch.nn.functional as F
 from torch_geometric.nn import (GCNConv, SAGEConv, GINConv,
                                 global_sort_pool, global_add_pool, global_mean_pool)
 
-from labelling_tricks import get_max_label
+from src.labelling_tricks import get_max_label
 
 
 class SEALMLP(torch.nn.Module):

@@ -5,7 +5,6 @@ Read and split ogb and planetoid datasets
 import os
 import time
 
-import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from ogb.linkproppred import PygLinkPropPredDataset
@@ -17,10 +16,10 @@ from torch_geometric.utils import (add_self_loops, negative_sampling,
 from torch_geometric.loader import DataLoader as pygDataLoader
 import wandb
 
-from utils import ROOT_DIR, get_same_source_negs
-from lcc import get_largest_connected_component, remap_edges, get_node_mapper
-from datasets.seal import get_train_val_test_datasets
-from datasets.elph import get_hashed_train_val_test_datasets, make_train_eval_data
+from src.utils import ROOT_DIR, get_same_source_negs
+from src.lcc import get_largest_connected_component, remap_edges, get_node_mapper
+from src.datasets.seal import get_train_val_test_datasets
+from src.datasets.elph import get_hashed_train_val_test_datasets, make_train_eval_data
 
 
 def get_loaders(args, dataset, splits, directed):

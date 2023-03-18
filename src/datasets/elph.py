@@ -4,7 +4,6 @@ constructing the hashed data objects used by elph and buddy
 
 import os
 from time import time
-from math import inf
 
 import torch
 from torch_geometric.data import Dataset
@@ -14,9 +13,9 @@ import scipy.sparse as ssp
 import torch_sparse
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
 
-from heuristics import RA
-from utils import ROOT_DIR, get_src_dst_degree, get_pos_neg_edges, get_same_source_negs
-from hashing import ElphHashes
+from src.heuristics import RA
+from src.utils import ROOT_DIR, get_src_dst_degree, get_pos_neg_edges, get_same_source_negs
+from src.hashing import ElphHashes
 
 
 class HashedDynamicDataset(Dataset):

@@ -14,7 +14,7 @@ from datasketch import MinHash, HyperLogLogPlusPlus, hyperloglog_const
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import add_self_loops
 
-from utils import neighbors
+from src.utils import neighbors
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
