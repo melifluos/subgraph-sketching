@@ -227,15 +227,6 @@ class HashedDynamicDataset(Dataset):
         src, dst = self.links[idx]
         if self.args.use_struct_feature:
             structure_features = self.structure_features[idx]
-            # if self.cache_structure_features:
-            #     try:
-            #         structure_features = self.structure_features[idx]
-            #     except TypeError:  # structure features are only cached in te
-            #         structure_features = self.elph_hashes.get_subgraph_features(self.links[idx], self.hashes,
-            #                                                                     self.cards)
-            # else:
-            #     structure_features = self.elph_hashes.get_subgraph_features(self.links[idx], self.hashes,
-            #                                                                 self.cards)
         else:
             structure_features = torch.zeros(self.max_hash_hops * (2 + self.max_hash_hops))
 
@@ -299,10 +290,11 @@ class HashedTrainEvalDataset(Dataset):
         return self.links[idx]
 
 
-def make_train_eval_data(args, train_dataset, num_nodes, hll_p=8, n_pos_samples=5000, negs_per_pos=1000):
+def make_train_eval_data(args, train_dataset, num_nodes, n_pos_samples=5000, negs_per_pos=1000):
     """
     A much smaller subset of the training data to get a comparable (with test and val) measure of training performance
     to diagnose overfitting
+    @param args: Namespace object of cmd args
     @param train_dataset: pyG Dataset object
     @param n_pos_samples: The number of positive samples to evaluate the training set on
     @return: HashedTrainEvalDataset

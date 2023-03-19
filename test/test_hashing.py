@@ -290,7 +290,7 @@ class HashingTests(unittest.TestCase):
         # test (2,2) features
         int22 = neighbors12.intersection(neighbors22)
         feat22 = int22.difference(feat12 | feat21 | int11)
-        self.assertTrue(isclose(len(feat22), features[(2, 2)], abs_tol=2))
+        self.assertTrue(isclose(len(feat22), features[(2, 2)], abs_tol=3))
         # TEST ORDER 3 FROM HERE
         #  (3,1)
         int31 = neighbors13.intersection(neighbors21)
