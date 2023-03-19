@@ -1,20 +1,16 @@
 """
 hashed based data sketching for graphs. Implemented in pytorch, but based on the datasketch library
 """
-import sys
 from time import time
 import logging
 
 import torch
 from torch import float
-from tqdm import tqdm
 import numpy as np
 from pandas.util import hash_array
-from datasketch import MinHash, HyperLogLogPlusPlus, hyperloglog_const
+from datasketch import HyperLogLogPlusPlus, hyperloglog_const
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import add_self_loops
-
-from src.utils import neighbors
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -70,7 +66,6 @@ class ElphHashes(object):
         self.label_lookup = LABEL_LOOKUP[self.max_hops]
         tmp = HyperLogLogPlusPlus(p=self.p)
         # store values that are shared and only depend on p
-        # self.m = tmp.m
         self.hll_hashfunc = tmp.hashfunc
         self.alpha = tmp.alpha
         # the rank is the number of leading zeros. The max rank is the number of bits used in the hashes (64) minus p
@@ -167,63 +162,7 @@ class ElphHashes(object):
             logger.info(f'{k} hop hash generation ran in {time() - start} s')
         return node_hashings_table, cards
 
-    def generate_hashes(self, num_nodes, adj):
-        """
-        Deprecated - old way of doing this by looping over nodes 20x slower than new way on CPU and not GPU compatible
-        @param num_nodes: The number of nodes in the graph
-        @param adj: A sparse csr adjacency matrix
-        @param max_hops: How many hops to approximate intersection sizes for
-        @return: hashes, cards. Hashes is a dictionary{dictionary}{tensor} with keys num_hops, 'hll' or 'minhash', cards
-        is a tensor[n_nodes, max_hops-1]
-        """
-        cards = torch.zeros((num_nodes, self.max_hops))
-        node_hashings_table = {}
-        for k in range(self.max_hops + 1):
-            print(f"Calculcating hop {k} hashes")
-            node_hashings_table[k] = {'hll': torch.zeros((num_nodes, self.hll_size), dtype=torch.int8),
-                                      'minhash': torch.zeros((num_nodes, self.num_perm), dtype=torch.int64)}
-            # todo: can probably refactor and replace num_nodes with A.shape[0]
-            start = time()
-            for node in tqdm(range(num_nodes)):
-                # create 0 hop Hashings with only one entry in each.
-
-                if k == 0:
-                    if True:
-                        node_hashings_table[k]['minhash'] = self.initialise_minhash(num_nodes)
-                        node_hashings_table[k]['hll'] = self.initialise_hll(num_nodes)
-                        break
-                    else:  # the deprecated way of doing this
-                        # Note we may need to adjust the parameters for all the constructors of hyperloglog and minhash
-                        # The more accurate the more likely we are to run out of memory
-                        hll = HyperLogLogPlusPlus(p=self.p)
-                        hll.update(node.to_bytes(8, byteorder=sys.byteorder, signed=False))
-
-                        minHash = MinHash(num_perm=self.num_perm)
-                        minHash.update(node.to_bytes(8, byteorder=sys.byteorder, signed=False))
-
-                        # node_hashings_table[k][node] = hll
-                        # sketch_table[k][node] = (hll, minHash)
-                        node_hashings_table[k]['hll'][node] = torch.tensor(hll.reg, dtype=torch.int8)
-                        node_hashings_table[k]['minhash'][node] = torch.tensor(minHash.hashvalues.astype(np.int64),
-                                                                               dtype=torch.int64)
-                # create k hop Hashings that combine all the k-1 neighbor Hashings
-                else:
-                    # Note: We might still want to use num_edges per nodes as a parameter to reduce the running time.
-                    # But we likely can choose a higher value than before
-                    root_reg = node_hashings_table[k - 1]['hll'][node]
-                    root_hash = node_hashings_table[k - 1]['minhash'][node]
-                    neighbor_nodes = list(neighbors([node], adj))
-                    regs = node_hashings_table[k - 1]['hll'][neighbor_nodes]
-                    hashvalues = node_hashings_table[k - 1]['minhash'][neighbor_nodes]
-                    new_reg = self.hll_neighbour_merge(root_reg, regs)
-                    new_hash = self.minhash_neighbour_merge(root_hash, hashvalues)
-                    cards[node, k - 1] = self.hll_count(new_reg)
-                    node_hashings_table[k]['hll'][node] = new_reg
-                    node_hashings_table[k]['minhash'][node] = new_hash
-            print(f'{k} hop hash generation ran in {time() - start} s')
-        return node_hashings_table, cards
-
-    def get_intersections(self, edge_list, hash_table):
+    def _get_intersections(self, edge_list, hash_table):
         """
         extract set intersections as jaccard * union
         @param edge_list: [n_edges, 2] tensor to get intersections for
@@ -240,12 +179,8 @@ class ElphHashes(object):
                 src_minhash = hash_table[k1]['minhash'][edge_list[:, 0]]
                 dst_hll = hash_table[k2]['hll'][edge_list[:, 1]]
                 dst_minhash = hash_table[k2]['minhash'][edge_list[:, 1]]
-                # dst = hash_table[k2][edge_list[:, 1]]
                 jaccard = self.jaccard(src_minhash, dst_minhash)
-                # hll = HyperLogLogPlusPlus(p=self.p)
-                # hll.merge(src)
-                # hll.merge(dst)
-                unions = self.hll_merge(src_hll, dst_hll)
+                unions = self._hll_merge(src_hll, dst_hll)
                 union_size = self.hll_count(unions)
                 intersection = jaccard * union_size
                 intersections[(k1, k2)] = intersection
@@ -266,7 +201,7 @@ class ElphHashes(object):
         nearest_neighbors = torch.argsort((e.unsqueeze(-1) - self.estimate_vector.to(e.device)) ** 2)[:, :6]
         return torch.mean(self.bias_vector[nearest_neighbors].to(e.device), dim=1)
 
-    def refine_hll_count_estimate(self, estimate):
+    def _refine_hll_count_estimate(self, estimate):
         idx = estimate <= 5 * self.m
         estimate_bias = self._estimate_bias(estimate)
         estimate[idx] = estimate[idx] - estimate_bias[idx]
@@ -290,11 +225,11 @@ class ElphHashes(object):
         # Use HyperLogLog estimation function
         e = (self.alpha * self.m ** 2) / torch.sum(2.0 ** (-regs[estimate_indices]), dim=1)
         # for some reason there are two more cases
-        e = self.refine_hll_count_estimate(e)
+        e = self._refine_hll_count_estimate(e)
         retval[estimate_indices] = e
         return retval
 
-    def hll_merge(self, src, dst):
+    def _hll_merge(self, src, dst):
         if src.shape != dst.shape:
             raise ValueError('source and destination register shapes must be the same')
         return torch.maximum(src, dst)
@@ -306,11 +241,6 @@ class ElphHashes(object):
     def minhash_neighbour_merge(self, root, neighbours):
         all_regs = torch.cat([root.unsqueeze(dim=0), neighbours], dim=0)
         return torch.min(all_regs, dim=0)[0]
-
-    def minhash_merge(self, src, dst):
-        if src.shape != dst.shape:
-            raise ValueError('source and destination register shapes must be the same')
-        return torch.minimum(src, dst)
 
     def jaccard(self, src, dst):
         """
@@ -334,7 +264,7 @@ class ElphHashes(object):
         """
         if links.dim() == 1:
             links = links.unsqueeze(0)
-        intersections = self.get_intersections(links, hash_table)
+        intersections = self._get_intersections(links, hash_table)
         cards1, cards2 = cards[links[:, 0]].to(links.device), cards[links[:, 1]].to(links.device)
         features = torch.zeros((len(links), self.max_hops * (self.max_hops + 2)), dtype=float, device=links.device)
         features[:, 0] = intersections[(1, 1)]

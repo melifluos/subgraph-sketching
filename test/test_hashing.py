@@ -77,13 +77,13 @@ class HashingTests(unittest.TestCase):
         hash_tables, cards = eh.build_hash_tables(self.n_nodes, self.edge_index)
         node1 = 0
         node2 = 1
-        features = eh.get_intersections(torch.tensor([[node1, node2]]), hash_tables)
+        features = eh._get_intersections(torch.tensor([[node1, node2]]), hash_tables)
         self.assertTrue(len(features) == max_hops ** 2)
         max_hops = 3
         self.args.max_hash_hops = max_hops
         eh = ElphHashes(self.args)
         hash_tables, cards = eh.build_hash_tables(self.n_nodes, self.edge_index)
-        features = eh.get_intersections(torch.tensor([[node1, node2]]), hash_tables)
+        features = eh._get_intersections(torch.tensor([[node1, node2]]), hash_tables)
         self.assertTrue(len(features) == max_hops ** 2)
 
     def test_find_neighbourhood_cardinality(self):
@@ -205,7 +205,7 @@ class HashingTests(unittest.TestCase):
         n_links = 6
         eh = ElphHashes(self.args)
         hash_table, cards = eh.build_hash_tables(self.n_nodes, self.edge_index)
-        intersections = eh.get_intersections(torch.tensor([[node1, node2]]), hash_table)
+        intersections = eh._get_intersections(torch.tensor([[node1, node2]]), hash_table)
         self.assertTrue(len(intersections) == max_hops ** 2)
         cards1 = cards[node1]
         self.assertTrue(len(cards1) == max_hops)
@@ -230,7 +230,7 @@ class HashingTests(unittest.TestCase):
         eh = ElphHashes(self.args)
         n_links = 10
         estimates = torch.rand(n_links) + 5 * eh.m - 0.5  # make sure we have estimates above and below the threshold
-        new_estimates = eh.refine_hll_count_estimate(estimates)
+        new_estimates = eh._refine_hll_count_estimate(estimates)
         self.assertTrue(new_estimates.shape == estimates.shape)
         idx = estimates > 5 * eh.m
         self.assertTrue(torch.allclose(new_estimates[idx], estimates[idx]))
@@ -250,6 +250,7 @@ class HashingTests(unittest.TestCase):
         self.assertTrue(isclose(jaccard, jaccard_est, abs_tol=0.1))
 
     def test_subgraph_features(self):
+        # todo double check this test as it seems to fail too often
         random.seed(0)
         n_links = 6
         self.args.max_hash_hops = 2
@@ -324,7 +325,7 @@ class HashingTests(unittest.TestCase):
         node1 = 0
         node2 = 1
         links = torch.tensor([[node1, node2], [node2, node1]])
-        intersections = eh.get_intersections(links, hashes)
+        intersections = eh._get_intersections(links, hashes)
         self.assertTrue(len(intersections) == self.args.max_hash_hops ** 2)
         neighbors11 = neighbors([node1], self.A).union({node1})
         neighbors21 = neighbors([node2], self.A).union({node2})

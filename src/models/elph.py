@@ -26,13 +26,9 @@ class LinkPredictor(torch.nn.Module):
         self.label_features_branch = args.label_features_branch
         self.use_bn = args.use_bn
         self.use_feature = args.use_feature
-        # self.feature_prop = args.feature_prop
         self.feature_dropout = args.feature_dropout
         self.label_dropout = args.label_dropout
         self.dim = args.max_hash_hops * (args.max_hash_hops + 2)
-        # if self.feature_prop == 'cat':
-        #   self.sign = SIGN(args.hidden_channels, args.hidden_channels, args.hidden_channels, self.num_layers,
-        #                    args.sign_dropout)
         if self.label_features_branch:
             self.label_lin_layer = Linear(self.dim, self.dim)
         if self.use_bn:
@@ -42,7 +38,6 @@ class LinkPredictor(torch.nn.Module):
                 self.bn_embs = torch.nn.BatchNorm1d(args.hidden_channels)
             self.bn_labels = torch.nn.BatchNorm1d(self.dim)
         if args.use_feature:
-            # self.lin_feat = Linear(num_features, args.hidden_channels)
             self.lin_feat = Linear(args.hidden_channels,
                                    args.hidden_channels)
             self.lin_out = Linear(args.hidden_channels, args.hidden_channels)
@@ -60,7 +55,6 @@ class LinkPredictor(torch.nn.Module):
         @param x: node features torch tensor [batch_size, 2, hidden_dim]
         @return: torch tensor [batch_size, hidden_dim]
         """
-        # x = self.lin_feat(x)
         x = x[:, 0, :] * x[:, 1, :]
         # mlp at the end
         x = self.lin_out(x)
@@ -91,14 +85,9 @@ class LinkPredictor(torch.nn.Module):
             x = F.dropout(sf, p=self.label_dropout, training=self.training)
         # process node features
         if self.use_feature:
-            # if self.feature_prop == 'cat':
-            #   node_features = self.sign(node_features)
-            # edge_features = self.feature_forward(node_features)
             node_features = self.feature_forward(node_features)
             x = torch.cat([x, node_features.to(torch.float)], 1)
         if emb is not None:
-            # if self.feature_prop == 'cat':
-            #   emb = self.sign(emb)
             node_embedding = self.embedding_forward(emb)
             x = torch.cat([x, node_embedding.to(torch.float)], 1)
         x = self.lin(x)
@@ -133,7 +122,6 @@ class ELPH(torch.nn.Module):
         self.node_embedding = node_embedding
         self.propagate_embeddings = args.propagate_embeddings
         self.sign_k = args.sign_k
-        # self.dropout = args.dropout
         self.label_dropout = args.label_dropout
         self.feature_dropout = args.feature_dropout
         self.label_features_branch = args.label_features_branch
@@ -141,8 +129,8 @@ class ELPH(torch.nn.Module):
         self.num_layers = args.max_hash_hops
         self.dim = args.max_hash_hops * (args.max_hash_hops + 2)
         # construct the nodewise NN components
-        self.convolution_builder(num_features, args.hidden_channels,
-                                 args)  # build the convolutions for features and embs
+        self._convolution_builder(num_features, args.hidden_channels,
+                                  args)  # build the convolutions for features and embs
         # construct the edgewise NN components
         self.predictor = LinkPredictor(args, node_embedding is not None)
         if self.sign_k != 0:
@@ -151,7 +139,7 @@ class ELPH(torch.nn.Module):
                 self.sign_embedding = SIGNEmbedding(args.hidden_channels, args.hidden_channels, args.hidden_channels,
                                                     args.sign_k, args.sign_dropout)
 
-    def convolution_builder(self, num_features, hidden_channels, args):
+    def _convolution_builder(self, num_features, hidden_channels, args):
         self.convs = torch.nn.ModuleList()
         if args.feature_prop in {'residual', 'cat'}:  # use a linear encoder
             self.feature_encoder = Linear(num_features, hidden_channels)
@@ -191,7 +179,7 @@ class ELPH(torch.nn.Module):
             out = x + out
         return out
 
-    def encode_features(self, x):
+    def _encode_features(self, x):
         if self.use_feature:
             x = self.feature_encoder(x)
             x = F.dropout(x, p=self.feature_dropout, training=self.training)
@@ -199,23 +187,6 @@ class ELPH(torch.nn.Module):
             x = None
 
         return x
-
-    def append_features(self, x, emb, xs, embs):
-        if x is not None:
-            xs.append(x)
-        if emb is not None:
-            embs.append(emb)
-
-    def cat_features(self, xs, embs):
-        if len(xs) > 0:
-            x = torch.cat(xs, dim=-1)
-        else:
-            x = None
-        if len(embs) > 0:
-            emb = torch.cat(embs, dim=-1)
-        else:
-            emb = None
-        return x, emb
 
     def forward(self, x, edge_index):
         """
@@ -233,8 +204,6 @@ class ELPH(torch.nn.Module):
         # initialise data tensors for storing k-hop hashes
         cards = torch.zeros((num_nodes, self.num_layers))
         node_hashings_table = {}
-        # if self.feature_prop == 'cat':
-        #     xs, embs = [], []
         for k in range(self.num_layers + 1):
             logger.info(f"Calculating hop {k} hashes")
             node_hashings_table[k] = {
@@ -245,7 +214,7 @@ class ELPH(torch.nn.Module):
                 node_hashings_table[k]['minhash'] = self.init_hashes
                 node_hashings_table[k]['hll'] = self.init_hll
                 if self.feature_prop in {'residual', 'cat'}:  # need to get features to the hidden dim
-                    x = self.encode_features(x)
+                    x = self._encode_features(x)
 
             else:
                 node_hashings_table[k]['hll'] = self.elph_hashes.hll_prop(node_hashings_table[k - 1]['hll'],
@@ -257,8 +226,6 @@ class ELPH(torch.nn.Module):
 
             logger.info(f'{k} hop hash generation ran in {time() - start} s')
 
-        # if self.feature_prop == 'cat':
-        #     x, emb = self.cat_features(xs, embs)
         return x, node_hashings_table, cards
 
 
@@ -324,7 +291,7 @@ class BUDDY(torch.nn.Module):
         gcn_edge_index, _ = gcn_norm(edge_index, num_nodes=num_nodes)
         return self.sign_embedding(self.node_embedding.weight, gcn_edge_index, num_nodes)
 
-    def append_degree_normalised(self, x, src_degree, dst_degree):
+    def _append_degree_normalised(self, x, src_degree, dst_degree):
         """
         Create a set of features that have the spirit of a cosine similarity x.y / ||x||.||y||. Some nodes (particularly negative samples)
         have zero degree
@@ -386,7 +353,7 @@ class BUDDY(torch.nn.Module):
         @return:
         """
         if self.append_normalised:
-            x = self.append_degree_normalised(x, src_degree, dst_degree)
+            x = self._append_degree_normalised(x, src_degree, dst_degree)
         if self.label_features_branch:
             x = self.label_lin_layer(x)
             if self.use_bn:
