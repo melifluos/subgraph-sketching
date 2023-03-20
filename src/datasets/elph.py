@@ -161,7 +161,7 @@ class HashDataset(Dataset):
             hop_str = f'{self.max_hash_hops}hop_'
         else:
             hop_str = ''
-        end_str = f'_{hop_str}structure_featurecache.pt'
+        end_str = f'_{hop_str}subgraph_featurecache.pt'
         if self.args.dataset_name == 'ogbl-collab' and self.args.year > 0:
             year_str = f'year_{self.args.year}'
         else:
@@ -324,7 +324,7 @@ def make_train_eval_data(args, train_dataset, num_nodes, n_pos_samples=5000, neg
         RA_links = None
     pos_sf = train_dataset.subgraph_features[:n_pos_samples]
     # try to read negative subgraph features from disk or generate them
-    subgraph_cache_name = f'{ROOT_DIR}/dataset/{dataset_name}/train_eval_negative_samples_{negs_per_pos}_structure_featurecache.pt'
+    subgraph_cache_name = f'{ROOT_DIR}/dataset/{dataset_name}/train_eval_negative_samples_{negs_per_pos}_subgraph_featurecache.pt'
     print(f'looking for subgraph features at {subgraph_cache_name}')
     if os.path.exists(subgraph_cache_name):
         neg_sf = torch.load(subgraph_cache_name).to(pos_sf.device)
