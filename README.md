@@ -1,8 +1,10 @@
-# subgraph-sketching
+# subgraph-sketching (Work in Progress)
 
 ## Introduction
 
-Code for Graph Neural Networks for Link Prediction with Subgraph Sketching https://openreview.net/pdf?id=m1oqEOAozQU
+This is a reimplementation of the code used for "Graph Neural Networks for Link Prediction with Subgraph Sketching" https://openreview.net/pdf?id=m1oqEOAozQU which was accepted for oral presentation (top 5% of accepted papers) at ICLR 2023.
+
+The high level structure of the code will not change, but some details such as default parameter setting remain work in progress
 
 ## Running experiments
 
@@ -39,10 +41,13 @@ if you are unfamiliar with wandb, quickstart instructions are
 
 
 ### Experiments
-For example to run ELPH for Cora with random splits:
+To run experiments
 ```
 cd src
 python runners/run.py --dataset Cora --model ELPH
+python runners/run.py --dataset Citeseer --model ELPH
+python runners/run.py --dataset Cora --model BUDDY
+python runners/run.py --dataset Citeseer --model BUDDY
 ```
 
 ### Dataset and Preprocessing
@@ -53,7 +58,7 @@ Create a root level
 ``` 
 
 ## Cite us
-If you found this work useful, please consider citing our papers
+If you found this work useful, please cite our paper
 ```
 @inproceedings
 {chamberlain2023graph,
