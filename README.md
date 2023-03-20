@@ -52,9 +52,9 @@ python runners/run.py --dataset Citeseer --model BUDDY
 
 ### Dataset and Preprocessing
 
-Create a root level 
+Create a root level folder
 ```
-./dataset folder
+./dataset
 ``` 
 
 ## Cite us
