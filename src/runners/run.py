@@ -179,8 +179,6 @@ if __name__ == '__main__':
                         help="whether to use raw node features as GNN input")
     parser.add_argument('--use_struct_feature', type=str2bool, default=True,
                         help="whether to use structural graph features as GNN input")
-    parser.add_argument('--linear_prop', action='store_true',
-                        help="encode the features with a linear layer instead of a GNN")
     parser.add_argument('--use_edge_weight', action='store_true',
                         help="whether to consider edge weight in GNN")
     # Training settings
