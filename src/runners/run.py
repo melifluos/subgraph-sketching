@@ -91,18 +91,18 @@ def run(args):
 
 def select_model(args, dataset, emb, device):
     if args.model == 'SEALDGCNN':
-        model = SEALDGCNN(args.hidden_channels, args.num_layers, args.max_z, args.sortpool_k,
+        model = SEALDGCNN(args.hidden_channels, args.num_seal_layers, args.max_z, args.sortpool_k,
                           dataset, args.dynamic_train, use_feature=args.use_feature,
                           node_embedding=emb).to(device)
     elif args.model == 'SEALSAGE':
-        model = SEALSAGE(args.hidden_channels, args.num_layers, args.max_z, dataset.num_features,
+        model = SEALSAGE(args.hidden_channels, args.num_seal_layers, args.max_z, dataset.num_features,
                          args.use_feature, node_embedding=emb, dropout=args.dropout).to(device)
     elif args.model == 'SEALGCN':
-        model = SEALGCN(args.hidden_channels, args.num_layers, args.max_z, dataset.num_features,
+        model = SEALGCN(args.hidden_channels, args.num_seal_layers, args.max_z, dataset.num_features,
                         args.use_feature, node_embedding=emb, dropout=args.dropout, pooling=args.seal_pooling).to(
             device)
     elif args.model == 'SEALGIN':
-        model = SEALGIN(args.hidden_channels, args.num_layers, args.max_z, dataset.num_features,
+        model = SEALGIN(args.hidden_channels, args.num_seal_layers, args.max_z, dataset.num_features,
                         args.use_feature, node_embedding=emb, dropout=args.dropout).to(device)
     elif args.model == 'BUDDY':
         model = BUDDY(args, dataset.num_features, node_embedding=emb).to(device)
@@ -147,18 +147,14 @@ if __name__ == '__main__':
                         help='this will cache the structure features for the val set. Useful for large datasets where eval dominates the runtime')
     parser.add_argument('--cache_train_structure_features', action='store_true',
                         help='this will cache the structure features for the train set. Useful for large datasets where eval dominates the runtime')
-    parser.add_argument('--floor_sf', type=str2bool, default=0,
-                        help='the structure features represent counts, so should not be negative. If --floor_sf the min is set to 0')
     parser.add_argument('--train_cache_size', type=int, default=inf, help='the number of training edges to cache')
     parser.add_argument('--year', type=int, default=0, help='filter training data from before this year')
     # GNN settings
     parser.add_argument('--model', type=str, default='BUDDY')
-    parser.add_argument('--num_layers', type=int, default=3)
-    parser.add_argument('--hidden_channels', type=int, default=256)
+    parser.add_argument('--hidden_channels', type=int, default=1024)
     parser.add_argument('--batch_size', type=int, default=256)
     parser.add_argument('--eval_batch_size', type=int, default=1000000,
                         help='eval batch size should be largest the GPU memory can take - the same is not necessarily true at training time')
-    parser.add_argument('--dropout', type=float, default=0.5)
     parser.add_argument('--label_dropout', type=float, default=0.5)
     parser.add_argument('--feature_dropout', type=float, default=0.5)
     parser.add_argument('--sign_dropout', type=float, default=0.5)
@@ -166,10 +162,12 @@ if __name__ == '__main__':
     parser.add_argument('--feature_prop', type=str, default='gcn',
                         help='how to propagate ELPH node features. Values are gcn, residual (resGCN) or cat (jumping knowledge networks)')
     # SEAL settings
+    parser.add_argument('--dropout', type=float, default=0.5)
+    parser.add_argument('--num_seal_layers', type=int, default=3)
     parser.add_argument('--sortpool_k', type=float, default=0.6)
     parser.add_argument('--label_pooling', type=str, default='add', help='add or mean')
     parser.add_argument('--seal_pooling', type=str, default='edge', help='how SEAL pools features in the subgraph')
-    # Subgraph extraction settings
+    # Subgraph settings
     parser.add_argument('--num_hops', type=int, default=1)
     parser.add_argument('--ratio_per_hop', type=float, default=1.0)
     parser.add_argument('--max_nodes_per_hop', type=int, default=None)
@@ -187,7 +185,7 @@ if __name__ == '__main__':
                         help="whether to consider edge weight in GNN")
     # Training settings
     parser.add_argument('--lr', type=float, default=0.0001)
-    parser.add_argument('--weight_decay', type=float, default=5e-4, help='Weight decay for optimization')
+    parser.add_argument('--weight_decay', type=float, default=0, help='Weight decay for optimization')
     parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--num_workers', type=int, default=4)
     parser.add_argument('--num_negs', type=int, default=1, help='number of negatives for each positive')
@@ -214,9 +212,11 @@ if __name__ == '__main__':
     parser.add_argument('--eval_metric', type=str, default='hits',
                         choices=('hits', 'mrr', 'auc'))
     parser.add_argument('--K', type=int, default=100, help='the hit rate @K')
-    # hashing settings
+    # hash settings
     parser.add_argument('--use_zero_one', type=str2bool,
                         help="whether to use the counts of (0,1) and (1,0) neighbors")
+    parser.add_argument('--floor_sf', type=str2bool, default=0,
+                        help='the subgraph features represent counts, so should not be negative. If --floor_sf the min is set to 0')
     parser.add_argument('--hll_p', type=int, default=8, help='the hyperloglog p parameter')
     parser.add_argument('--minhash_num_perm', type=int, default=128, help='the number of minhash perms')
     parser.add_argument('--max_hash_hops', type=int, default=2, help='the maximum number of hops to hash')

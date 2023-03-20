@@ -229,7 +229,6 @@ class BUDDY(torch.nn.Module):
         super(BUDDY, self).__init__()
 
         self.use_feature = args.use_feature
-        self.dropout = args.dropout
         self.label_dropout = args.label_dropout
         self.feature_dropout = args.feature_dropout
         self.node_embedding = node_embedding
