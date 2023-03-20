@@ -23,20 +23,16 @@ class LinkPredictor(torch.nn.Module):
     def __init__(self, args, use_embedding=False):
         super(LinkPredictor, self).__init__()
         self.use_embedding = use_embedding
-        self.label_features_branch = args.label_features_branch
-        self.use_bn = args.use_bn
         self.use_feature = args.use_feature
         self.feature_dropout = args.feature_dropout
         self.label_dropout = args.label_dropout
         self.dim = args.max_hash_hops * (args.max_hash_hops + 2)
-        if self.label_features_branch:
-            self.label_lin_layer = Linear(self.dim, self.dim)
-        if self.use_bn:
-            if args.use_feature:
-                self.bn_feats = torch.nn.BatchNorm1d(args.hidden_channels)
-            if self.use_embedding:
-                self.bn_embs = torch.nn.BatchNorm1d(args.hidden_channels)
-            self.bn_labels = torch.nn.BatchNorm1d(self.dim)
+        self.label_lin_layer = Linear(self.dim, self.dim)
+        if args.use_feature:
+            self.bn_feats = torch.nn.BatchNorm1d(args.hidden_channels)
+        if self.use_embedding:
+            self.bn_embs = torch.nn.BatchNorm1d(args.hidden_channels)
+        self.bn_labels = torch.nn.BatchNorm1d(self.dim)
         if args.use_feature:
             self.lin_feat = Linear(args.hidden_channels,
                                    args.hidden_channels)
@@ -58,8 +54,7 @@ class LinkPredictor(torch.nn.Module):
         x = x[:, 0, :] * x[:, 1, :]
         # mlp at the end
         x = self.lin_out(x)
-        if self.use_bn:
-            x = self.bn_feats(x)
+        x = self.bn_feats(x)
         x = F.relu(x)
         x = F.dropout(x, p=self.feature_dropout, training=self.training)
         return x
@@ -69,20 +64,17 @@ class LinkPredictor(torch.nn.Module):
         x = x[:, 0, :] * x[:, 1, :]
         # mlp at the end
         x = self.lin_emb_out(x)
-        if self.use_bn:
-            x = self.bn_embs(x)
+        x = self.bn_embs(x)
         x = F.relu(x)
         x = F.dropout(x, p=self.feature_dropout, training=self.training)
 
         return x
 
     def forward(self, sf, node_features, emb=None):
-        if self.label_features_branch:
-            sf = self.label_lin_layer(sf)
-            if self.use_bn:
-                sf = self.bn_labels(sf)
-            sf = F.relu(sf)
-            x = F.dropout(sf, p=self.label_dropout, training=self.training)
+        sf = self.label_lin_layer(sf)
+        sf = self.bn_labels(sf)
+        sf = F.relu(sf)
+        x = F.dropout(sf, p=self.label_dropout, training=self.training)
         # process node features
         if self.use_feature:
             node_features = self.feature_forward(node_features)
@@ -124,8 +116,6 @@ class ELPH(torch.nn.Module):
         self.sign_k = args.sign_k
         self.label_dropout = args.label_dropout
         self.feature_dropout = args.feature_dropout
-        self.label_features_branch = args.label_features_branch
-        self.use_bn = args.use_bn
         self.num_layers = args.max_hash_hops
         self.dim = args.max_hash_hops * (args.max_hash_hops + 2)
         # construct the nodewise NN components
@@ -244,8 +234,6 @@ class BUDDY(torch.nn.Module):
         self.feature_dropout = args.feature_dropout
         self.node_embedding = node_embedding
         self.propagate_embeddings = args.propagate_embeddings
-        self.label_features_branch = args.label_features_branch
-        self.use_bn = args.use_bn
         # using both unormalised and degree normalised counts as features, hence * 2
         self.append_normalised = args.add_normed_features
         ra_counter = 1 if args.use_RA else 0
@@ -261,17 +249,13 @@ class BUDDY(torch.nn.Module):
             else:
                 self.sign = SIGN(num_features, args.hidden_channels, args.hidden_channels, args.sign_k,
                                  args.sign_dropout)
-
-        if self.label_features_branch:
-            self.label_lin_layer = Linear(self.dim, self.dim)
-
-        if self.use_bn:
-            if args.use_feature:
-                self.bn_feats = torch.nn.BatchNorm1d(args.hidden_channels)
-            if self.node_embedding is not None:
-                self.bn_embs = torch.nn.BatchNorm1d(args.hidden_channels)
-            self.bn_labels = torch.nn.BatchNorm1d(self.dim)
-            self.bn_RA = torch.nn.BatchNorm1d(1)
+        self.label_lin_layer = Linear(self.dim, self.dim)
+        if args.use_feature:
+            self.bn_feats = torch.nn.BatchNorm1d(args.hidden_channels)
+        if self.node_embedding is not None:
+            self.bn_embs = torch.nn.BatchNorm1d(args.hidden_channels)
+        self.bn_labels = torch.nn.BatchNorm1d(self.dim)
+        self.bn_RA = torch.nn.BatchNorm1d(1)
 
         if args.use_feature:
             self.lin_feat = Linear(num_features,
@@ -323,8 +307,7 @@ class BUDDY(torch.nn.Module):
         x = x[:, 0, :] * x[:, 1, :]
         # mlp at the end
         x = self.lin_out(x)
-        if self.use_bn:
-            x = self.bn_feats(x)
+        x = self.bn_feats(x)
         x = F.relu(x)
         x = F.dropout(x, p=self.feature_dropout, training=self.training)
         return x
@@ -334,8 +317,7 @@ class BUDDY(torch.nn.Module):
         x = x[:, 0, :] * x[:, 1, :]
         # mlp at the end
         x = self.lin_emb_out(x)
-        if self.use_bn:
-            x = self.bn_embs(x)
+        x = self.bn_embs(x)
         x = F.relu(x)
         x = F.dropout(x, p=self.feature_dropout, training=self.training)
 
@@ -354,12 +336,10 @@ class BUDDY(torch.nn.Module):
         """
         if self.append_normalised:
             x = self._append_degree_normalised(x, src_degree, dst_degree)
-        if self.label_features_branch:
-            x = self.label_lin_layer(x)
-            if self.use_bn:
-                x = self.bn_labels(x)
-            x = F.relu(x)
-            x = F.dropout(x, p=self.label_dropout, training=self.training)
+        x = self.label_lin_layer(x)
+        x = self.bn_labels(x)
+        x = F.relu(x)
+        x = F.dropout(x, p=self.label_dropout, training=self.training)
         if self.use_feature:
             node_features = self.feature_forward(node_features)
             x = torch.cat([x, node_features.to(torch.float)], 1)
@@ -368,8 +348,7 @@ class BUDDY(torch.nn.Module):
             x = torch.cat([x, node_embedding.to(torch.float)], 1)
         if self.use_RA:
             RA = RA.unsqueeze(-1)
-            if self.use_bn:
-                RA = self.bn_RA(RA)
+            RA = self.bn_RA(RA)
             x = torch.cat([x, RA], 1)
         x = self.lin(x)
         return x

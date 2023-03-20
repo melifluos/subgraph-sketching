@@ -154,8 +154,8 @@ if __name__ == '__main__':
     # GNN settings
     parser.add_argument('--model', type=str, default='BUDDY')
     parser.add_argument('--num_layers', type=int, default=3)
-    parser.add_argument('--hidden_channels', type=int, default=32)
-    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--hidden_channels', type=int, default=256)
+    parser.add_argument('--batch_size', type=int, default=256)
     parser.add_argument('--eval_batch_size', type=int, default=1000000,
                         help='eval batch size should be largest the GPU memory can take - the same is not necessarily true at training time')
     parser.add_argument('--dropout', type=float, default=0.5)
@@ -185,17 +185,10 @@ if __name__ == '__main__':
                         help="encode the features with a linear layer instead of a GNN")
     parser.add_argument('--use_edge_weight', action='store_true',
                         help="whether to consider edge weight in GNN")
-    parser.add_argument('--label_features_branch', type=str2bool,
-                        help="whether to consider edge weight in GNN")
-    parser.add_argument('--use_bn', type=str2bool,
-                        help="whether to consider edge weight in GNN")
     # Training settings
     parser.add_argument('--lr', type=float, default=0.0001)
-    # parser.add_argument('--l1', type=float, default=0., help='adds L1 regularisation to all model params')
     parser.add_argument('--weight_decay', type=float, default=5e-4, help='Weight decay for optimization')
     parser.add_argument('--epochs', type=int, default=50)
-    # parser.add_argument('--runs', type=int, default=1)
-
     parser.add_argument('--num_workers', type=int, default=4)
     parser.add_argument('--num_negs', type=int, default=1, help='number of negatives for each positive')
     parser.add_argument('--train_node_embedding', action='store_true',
@@ -204,7 +197,7 @@ if __name__ == '__main__':
                         help='propagate the node embeddings using the GCN diffusion operator')
     parser.add_argument('--loss', default='bce', type=str, help='bce or auc')
     parser.add_argument('--add_normed_features', dest='add_normed_features', type=str2bool,
-                        help='only used for the linear model. Adds a set of features that are normalsied by sqrt(d_i*d_j) to calculate cosine sim')
+                        help='Adds a set of features that are normalsied by sqrt(d_i*d_j) to calculate cosine sim')
     parser.add_argument('--use_RA', type=str2bool, default=False, help='whether to add resource allocation features')
     # SEAL specific args
     parser.add_argument('--dynamic_train', action='store_true',

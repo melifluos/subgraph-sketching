@@ -15,7 +15,7 @@ DEFAULT_DIC = {'sample_size': None, 'dataset_name': 'Cora', 'num_hops': 2, 'max_
                'data_appendix': None, 'val_pct': 0.1, 'test_pct': 0.2, 'train_sample': 1, 'dynamic_train': True,
                'dynamic_val': True, 'model': 'hashing', 'sign_k': 2,
                'dynamic_test': True, 'node_label': 'drnl', 'ratio_per_hop': 1, 'use_feature': True, 'dropout': 0,
-               'label_dropout': 0, 'feature_dropout': 0, 'label_features_branch': True, 'use_bn': True,
+               'label_dropout': 0, 'feature_dropout': 0,
                'add_normed_features': False, 'use_RA': False, 'hidden_channels': 32, 'load_features': True,
                'load_hashes': True, 'use_zero_one': True, 'test_citation_sample_size': None,
                'val_citation_sample_size': None, 'wandb': False, 'batch_size': 32, 'num_workers': 1,
