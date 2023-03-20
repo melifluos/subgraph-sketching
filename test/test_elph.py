@@ -14,7 +14,7 @@ from runners.run import run
 from test_params import OPT, setup_seed
 from models.elph import ELPH, LinkPredictor
 from utils import ROOT_DIR, select_embedding
-from datasets.elph import HashedDynamicDataset
+from datasets.elph import HashDataset
 
 
 class ELPHTests(unittest.TestCase):
@@ -108,8 +108,7 @@ class ELPHTests(unittest.TestCase):
         split = 'train'
         pos_edges = torch.randint(self.n_nodes, (n_links, 2))
         neg_edges = torch.randint(self.n_nodes, (n_links, 2))
-        hdd = HashedDynamicDataset(root, split, data, pos_edges, neg_edges, args, use_coalesce=False, directed=False,
-                                   cache_structure_features=False)
+        hdd = HashDataset(root, split, data, pos_edges, neg_edges, args, use_coalesce=False, directed=False)
         dl = DataLoader(hdd, batch_size=1,
                         shuffle=False, num_workers=1)
         loss = train_elph(gnn, optimizer, dl, args, device)
@@ -155,8 +154,7 @@ class ELPHTests(unittest.TestCase):
         split = 'train'
         pos_edges = torch.randint(self.n_nodes, (n_links, 2))
         neg_edges = torch.randint(self.n_nodes, (n_links, 2))
-        hdd = HashedDynamicDataset(root, split, data, pos_edges, neg_edges, args, use_coalesce=False, directed=False,
-                                   cache_structure_features=False)
+        hdd = HashDataset(root, split, data, pos_edges, neg_edges, args, use_coalesce=False, directed=False)
         dl = DataLoader(hdd, batch_size=1, shuffle=False, num_workers=1)
         pos_pred, neg_pred, pred, labels = get_elph_preds(gnn, dl, self.x.device, args, split='test')
         self.assertTrue(len(pos_pred == len(pos_edges)))

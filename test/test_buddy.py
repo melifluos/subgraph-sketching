@@ -22,7 +22,7 @@ from runners.inference import get_buddy_preds
 from test_params import OPT, setup_seed
 from models.elph import BUDDY, LinkPredictor
 from utils import ROOT_DIR, select_embedding
-from datasets.elph import HashedDynamicDataset
+from datasets.elph import HashDataset
 from hashing import ElphHashes
 from runners.run import run
 from datasets.elph import get_src_dst_degree
@@ -68,7 +68,7 @@ class BUDDYTests(unittest.TestCase):
         self.assertTrue(dst_degree == degrees[dst])
 
     def test_get_buddy_preds(self):
-        opt = {'dataset_name': 'Cora', 'cache_test_structure_features': True, 'bulk_test': True}
+        opt = {'dataset_name': 'Cora', 'cache_subgraph_features': True, 'bulk_test': True}
         opt = {**OPT, **opt}
         args = Namespace(
             **opt)
@@ -86,7 +86,7 @@ class BUDDYTests(unittest.TestCase):
         self.assertTrue(len(pos_pred) + len(neg_pred) == len(test_dataset.links))
 
     def test_train_buddy(self):
-        opt = {'dataset_name': 'Cora', 'cache_train_structure_features': True, 'use_RA': True}
+        opt = {'dataset_name': 'Cora', 'cache_subgraph_features': True, 'use_RA': True}
         opt = {**OPT, **opt}
         args = Namespace(
             **opt)
@@ -102,14 +102,14 @@ class BUDDYTests(unittest.TestCase):
         link_loader = DataLoader(range(len(train_dataset.links)), args.batch_size, shuffle=True)
         for batch_count, indices in enumerate(link_loader):
             curr_links = torch.tensor(train_dataset.links[indices])
-            structure_features = train_dataset.structure_features[indices].to(device)
+            subgraph_features = train_dataset.subgraph_features[indices].to(device)
             node_features = train_dataset.x[curr_links].to(device)
             degrees = train_dataset.degrees[curr_links].to(device)
             if args.use_RA:
                 RA = train_dataset.RA[indices].to(device)
             else:
                 RA = None
-            logits = model(structure_features, node_features, degrees[:, 0], degrees[:, 1], RA)
+            logits = model(subgraph_features, node_features, degrees[:, 0], degrees[:, 1], RA)
             self.assertTrue(len(logits), args.batch_size)
             if (batch_count + 1) * args.batch_size >= 32:
                 break

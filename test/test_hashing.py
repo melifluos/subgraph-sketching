@@ -107,7 +107,7 @@ class HashingTests(unittest.TestCase):
         max_hops = 3
         self.args.max_hash_hops = max_hops
         #  some of these tests fail due to negative feature values, but this doesn't seem to be a problem for larger datasets
-        self.args.floor_sf = True  # make structure features >= 0
+        self.args.floor_sf = True  # make subgraph features >= 0
         self.args.hll_p = 16  # choose a high value for more accuracy
         eh = ElphHashes(self.args)
         hash_tables, cards = eh.build_hash_tables(self.n_nodes, self.edge_index)
@@ -388,7 +388,7 @@ class HashingTests(unittest.TestCase):
         setup_seed(0)
         n_links = 100
         self.args.max_hash_hops = 2
-        self.args.floor_sf = True  # make structure features >= 0
+        self.args.floor_sf = True  # make subgraph features >= 0
         self.args.hll_p = 16  # choose a high value for more accuracy
         eh = ElphHashes(self.args)
         hashes, cards = eh.build_hash_tables(self.n_nodes, self.edge_index)

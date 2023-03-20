@@ -141,12 +141,8 @@ if __name__ == '__main__':
     parser.add_argument('--sign_k', type=int, default=0)
     parser.add_argument('--load_features', action='store_true', help='load node features from disk')
     parser.add_argument('--load_hashes', action='store_true', help='load hashes from disk')
-    parser.add_argument('--cache_test_structure_features', action='store_true',
-                        help='this will cache the structure features for the test set. Useful for large datasets where eval dominates the runtime')
-    parser.add_argument('--cache_val_structure_features', action='store_true',
-                        help='this will cache the structure features for the val set. Useful for large datasets where eval dominates the runtime')
-    parser.add_argument('--cache_train_structure_features', action='store_true',
-                        help='this will cache the structure features for the train set. Useful for large datasets where eval dominates the runtime')
+    parser.add_argument('--cache_subgraph_features', action='store_true',
+                        help='write / read subgraph features from disk')
     parser.add_argument('--train_cache_size', type=int, default=inf, help='the number of training edges to cache')
     parser.add_argument('--year', type=int, default=0, help='filter training data from before this year')
     # GNN settings

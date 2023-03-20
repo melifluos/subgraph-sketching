@@ -123,11 +123,10 @@ class ELPH(torch.nn.Module):
                                   args)  # build the convolutions for features and embs
         # construct the edgewise NN components
         self.predictor = LinkPredictor(args, node_embedding is not None)
-        if self.sign_k != 0:
-            if self.propagate_embeddings:
-                # only used for the ddi where nodes have no features and transductive node embeddings are needed
-                self.sign_embedding = SIGNEmbedding(args.hidden_channels, args.hidden_channels, args.hidden_channels,
-                                                    args.sign_k, args.sign_dropout)
+        if self.sign_k != 0 and self.propagate_embeddings:
+            # only used for the ddi where nodes have no features and transductive node embeddings are needed
+            self.sign_embedding = SIGNEmbedding(args.hidden_channels, args.hidden_channels, args.hidden_channels,
+                                                args.sign_k, args.sign_dropout)
 
     def _convolution_builder(self, num_features, hidden_channels, args):
         self.convs = torch.nn.ModuleList()
@@ -322,10 +321,10 @@ class BUDDY(torch.nn.Module):
 
         return x
 
-    def forward(self, x, node_features, src_degree=None, dst_degree=None, RA=None, emb=None):
+    def forward(self, sf, node_features, src_degree=None, dst_degree=None, RA=None, emb=None):
         """
         forward pass for one batch of edges
-        @param x: structure features [batch_size, num_hops*(num_hops+2)]
+        @param sf: subgraph features [batch_size, num_hops*(num_hops+2)]
         @param node_features: raw node features [batch_size, 2, num_features]
         @param src_degree: degree of source nodes in batch
         @param dst_degree:
@@ -334,8 +333,8 @@ class BUDDY(torch.nn.Module):
         @return:
         """
         if self.append_normalised:
-            x = self._append_degree_normalised(x, src_degree, dst_degree)
-        x = self.label_lin_layer(x)
+            sf = self._append_degree_normalised(sf, src_degree, dst_degree)
+        x = self.label_lin_layer(sf)
         x = self.bn_labels(x)
         x = F.relu(x)
         x = F.dropout(x, p=self.label_dropout, training=self.training)

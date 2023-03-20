@@ -18,9 +18,7 @@ DEFAULT_DIC = {'sample_size': None, 'dataset_name': 'Cora', 'num_hops': 2, 'max_
                'label_dropout': 0, 'feature_dropout': 0,
                'add_normed_features': False, 'use_RA': False, 'hidden_channels': 32, 'load_features': True,
                'load_hashes': True, 'use_zero_one': True, 'wandb': False, 'batch_size': 32, 'num_workers': 1,
-               'cache_train_structure_features': False, 'cache_val_structure_features': False,
-               'cache_test_structure_features': False,
-               'citation_sample_size': None, 'eval_batch_size': 1000, 'num_negs': 1}
+               'cache_subgraph_features': False, 'eval_batch_size': 1000, 'num_negs': 1}
 
 
 def print_model_params(model):

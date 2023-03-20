@@ -45,7 +45,7 @@ class HllPropagation(MessagePassing):
 
 class ElphHashes(object):
     """
-    class to store hashes and retrieve structure features
+    class to store hashes and retrieve subgraph features
     """
 
     def __init__(self, args):

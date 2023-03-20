@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from torch_geometric.utils.random import barabasi_albert_graph
 import scipy.sparse as ssp
 
-from datasets.elph import HashedDynamicDataset, make_train_eval_data
+from datasets.elph import HashDataset, make_train_eval_data
 from test_params import OPT
 from utils import ROOT_DIR
 from hashing import ElphHashes
@@ -52,10 +52,10 @@ class ELPHDatasetTests(unittest.TestCase):
             torch.save(cards, cards_name)
         all_edges = torch.cat([self.pos_edges, self.neg_edges], 0)
         # construct features directly from hashes and cards
-        structure_features = eh.get_subgraph_features(all_edges, hashes, cards)
+        subgraph_features = eh.get_subgraph_features(all_edges, hashes, cards)
         # construct features implicitly (hopefully) using the same hashes and cards
-        hdd = HashedDynamicDataset(root, split, data, self.pos_edges, self.neg_edges, self.args, use_coalesce=False,
-                                   directed=False, cache_structure_features=False)
+        hdd = HashDataset(root, split, data, self.pos_edges, self.neg_edges, self.args, use_coalesce=False,
+                          directed=False)
         self.assertTrue(hdd.links.shape == (2 * self.n_edges, 2))
         self.assertTrue(len(hdd.labels) == 2 * self.n_edges)
         self.assertTrue(len(hdd.edge_weight) == self.edge_index.shape[1])
@@ -63,7 +63,7 @@ class ELPHDatasetTests(unittest.TestCase):
         dl = DataLoader(hdd, batch_size=1,
                         shuffle=False, num_workers=1)
         # check the dataset has the same features
-        for sf, elem in zip(structure_features, dl):
+        for sf, elem in zip(subgraph_features, dl):
             sf_test = elem[0]
             self.assertTrue(torch.all(torch.eq(sf, sf_test)))
 
@@ -78,9 +78,9 @@ class ELPHDatasetTests(unittest.TestCase):
         split = 'train'
         ei = self.edge_index
         data = Data(self.x, ei)
-        hdd = HashedDynamicDataset(root, split, data, self.pos_edges, self.neg_edges, self.args, use_coalesce=False,
-                                   directed=False,
-                                   load_features=True, cache_structure_features=True)
+        hdd = HashDataset(root, split, data, self.pos_edges, self.neg_edges, self.args, use_coalesce=False,
+                          directed=False,
+                          load_features=True)
 
     def test_make_train_eval_dataset(self):
         self.args.max_hash_hops = 2
@@ -93,17 +93,16 @@ class ELPHDatasetTests(unittest.TestCase):
         ei = self.edge_index
         data = Data(self.x, ei)
         root = f'{ROOT_DIR}/test/dataset/test_HashedDynamicDataset'
-        hdd = HashedDynamicDataset(root, split, data, pos_edges, neg_edges, self.args, use_coalesce=False,
-                                   directed=False,
-                                   load_features=True, cache_structure_features=True)
+        hdd = HashDataset(root, split, data, pos_edges, neg_edges, self.args, use_coalesce=False,
+                          directed=False)
         train_eval_dataset = make_train_eval_data(self.args, hdd, self.n_nodes, n_pos_samples=n_pos_samples,
                                                   negs_per_pos=negs_per_pos)
         self.assertTrue(len(train_eval_dataset.links) == (negs_per_pos + 1) * n_pos_samples)
         self.assertTrue(len(train_eval_dataset.labels) == (negs_per_pos + 1) * n_pos_samples)
-        self.assertTrue(len(train_eval_dataset.structure_features) == (negs_per_pos + 1) * n_pos_samples)
+        self.assertTrue(len(train_eval_dataset.subgraph_features) == (negs_per_pos + 1) * n_pos_samples)
         self.args.use_RA = True
-        hdd = HashedDynamicDataset(root, split, data, pos_edges, neg_edges, self.args, use_coalesce=False,
-                                   directed=False, cache_structure_features=True)
+        hdd = HashDataset(root, split, data, pos_edges, neg_edges, self.args, use_coalesce=False,
+                          directed=False)
         train_eval_dataset = make_train_eval_data(self.args, hdd, self.n_nodes, n_pos_samples=n_pos_samples,
                                                   negs_per_pos=negs_per_pos)
         self.assertTrue(len(train_eval_dataset.RA) == (negs_per_pos + 1) * n_pos_samples)

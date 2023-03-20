@@ -57,9 +57,9 @@ def train_buddy(model, optimizer, train_loader, args, device, emb=None):
 
         if args.use_struct_feature:
             sf_indices = sample_indices[indices]  # need the original link indices as these correspond to sf
-            structure_features = data.structure_features[sf_indices].to(device)
+            subgraph_features = data.subgraph_features[sf_indices].to(device)
         else:
-            structure_features = torch.zeros(data.structure_features[indices].shape).to(device)
+            subgraph_features = torch.zeros(data.subgraph_features[indices].shape).to(device)
         node_features = data.x[curr_links].to(device)
         degrees = data.degrees[curr_links].to(device)
         if args.use_RA:
@@ -69,7 +69,7 @@ def train_buddy(model, optimizer, train_loader, args, device, emb=None):
             RA = None
         start_time = time.time()
         optimizer.zero_grad()
-        logits = model(structure_features, node_features, degrees[:, 0], degrees[:, 1], RA, batch_emb)
+        logits = model(subgraph_features, node_features, degrees[:, 0], degrees[:, 1], RA, batch_emb)
         loss = get_loss(args.loss)(logits, labels[indices].squeeze(0).to(device))
 
         loss.backward()
@@ -201,12 +201,12 @@ def train_elph(model, optimizer, train_loader, args, device):
         batch_emb = None if emb is None else emb[curr_links].to(device)
         # hydrate link features
         if args.use_struct_feature:
-            structure_features = model.elph_hashes.get_subgraph_features(curr_links, hashes, cards).to(device)
+            subgraph_features = model.elph_hashes.get_subgraph_features(curr_links, hashes, cards).to(device)
         else:  # todo fix this
-            structure_features = torch.zeros(data.structure_features[indices].shape).to(device)
+            subgraph_features = torch.zeros(data.subgraph_features[indices].shape).to(device)
         start_time = time.time()
         optimizer.zero_grad()
-        logits = model.predictor(structure_features, batch_node_features, batch_emb)
+        logits = model.predictor(subgraph_features, batch_node_features, batch_emb)
         loss = get_loss(args.loss)(logits, labels[indices].squeeze(0).to(device))
 
         loss.backward()

@@ -117,16 +117,16 @@ def get_buddy_preds(model, loader, device, args, split=None):
         curr_links = links[indices].to(device)
         batch_emb = None if emb is None else emb[curr_links].to(device)
         if args.use_struct_feature:
-            structure_features = data.structure_features[indices].to(device)
+            subgraph_features = data.subgraph_features[indices].to(device)
         else:
-            structure_features = torch.zeros(data.structure_features[indices].shape).to(device)
+            subgraph_features = torch.zeros(data.subgraph_features[indices].shape).to(device)
         node_features = data.x[curr_links].to(device)
         degrees = data.degrees[curr_links].to(device)
         if args.use_RA:
             RA = data.RA[indices].to(device)
         else:
             RA = None
-        logits = model(structure_features, node_features, degrees[:, 0], degrees[:, 1], RA, batch_emb)
+        logits = model(subgraph_features, node_features, degrees[:, 0], degrees[:, 1], RA, batch_emb)
         preds.append(logits.view(-1).cpu())
         if (batch_count + 1) * args.eval_batch_size > n_samples:
             break
@@ -187,11 +187,11 @@ def get_elph_preds(model, loader, device, args, split=None):
         curr_links = links[indices].to(device)
         batch_emb = None if emb is None else emb[curr_links].to(device)
         if args.use_struct_feature:
-            structure_features = model.elph_hashes.get_subgraph_features(curr_links, hashes, cards).to(device)
+            subgraph_features = model.elph_hashes.get_subgraph_features(curr_links, hashes, cards).to(device)
         else:
-            structure_features = torch.zeros(data.structure_features[indices].shape).to(device)
+            subgraph_features = torch.zeros(data.subgraph_features[indices].shape).to(device)
         batch_node_features = None if node_features is None else node_features[curr_links]
-        logits = model.predictor(structure_features, batch_node_features, batch_emb)
+        logits = model.predictor(subgraph_features, batch_node_features, batch_emb)
         preds.append(logits.view(-1).cpu())
         if (batch_count + 1) * args.eval_batch_size > n_samples:
             break
