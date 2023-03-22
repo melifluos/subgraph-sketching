@@ -199,7 +199,7 @@ class ElphHashes(object):
         @return:
         """
         nearest_neighbors = torch.argsort((e.unsqueeze(-1) - self.estimate_vector.to(e.device)) ** 2)[:, :6]
-        return torch.mean(self.bias_vector[nearest_neighbors].to(e.device), dim=1)
+        return torch.mean(self.bias_vector.to(e.device)[nearest_neighbors], dim=1)
 
     def _refine_hll_count_estimate(self, estimate):
         idx = estimate <= 5 * self.m
@@ -265,7 +265,7 @@ class ElphHashes(object):
         if links.dim() == 1:
             links = links.unsqueeze(0)
         intersections = self._get_intersections(links, hash_table)
-        cards1, cards2 = cards[links[:, 0]].to(links.device), cards[links[:, 1]].to(links.device)
+        cards1, cards2 = cards.to(links.device)[links[:, 0]], cards.to(links.device)[links[:, 1]]
         features = torch.zeros((len(links), self.max_hops * (self.max_hops + 2)), dtype=float, device=links.device)
         features[:, 0] = intersections[(1, 1)]
         if self.max_hops == 1:
