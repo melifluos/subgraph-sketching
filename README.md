@@ -9,32 +9,41 @@ The high level structure of the code will not change, but some details such as d
 ## Running experiments
 
 ### Requirements
-Dependencies (with python >= 3.10):
+Dependencies (with python >= 3.9):
 Main dependencies are
 
 pytorch==1.13
 
-pyg==2.2
+torch_geometric==2.2.0
 
-wandb==0.13.9 (for logging and tuning)
+torch-scatter==2.1.1+pt113cpu
 
-datasketch==1.5.9
+torch-sparse==0.6.17+pt113cpu
 
-fast-pagerank==0.0.4 (only to run PPR baselines)
+torch-spline-conv==1.2.2+pt113cpu
 
-scipy==1.10.0
 
-Example commands to install the dependencies in a new conda environment
+Example commands to install the dependencies in a new conda environment (tested on Linux machine without GPU).
 ```
-conda create --name ss python=3.10
+conda create --name ss python=3.9
 conda activate ss
-conda install pytorch torchvision torchaudio pytorch-cuda=11.6 -c pytorch -c nvidia
-conda install pyg -c pyg
-conda install -c anaconda scipy
-pip install fast-pagerank
-pip install wandb
-pip install datasketch
+conda install pytorch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 -c pytorch
+pip install torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-1.13.0+cpu.html
+pip install torch_geometric
+pip install fast-pagerank wandb datasketch ogb
 ```
+
+
+For GPU installation: 
+```
+conda create --name ss python=3.9
+conda activate ss
+conda install pytorch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 pytorch-cuda=11.6 -c pytorch -c nvidia
+pip install torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-1.13.0+cu116.html
+pip install torch_geometric
+pip install fast-pagerank wandb datasketch ogb
+```
+
 
 if you are unfamiliar with wandb, quickstart instructions are
 [pip install wandb](https://docs.wandb.ai/quickstart)
