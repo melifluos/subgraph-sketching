@@ -52,7 +52,7 @@ def train_buddy(model, optimizer, train_loader, args, device, emb=None):
                 emb = model.node_embedding.weight
         else:
             emb = None
-        curr_links = links[indices].to(device)
+        curr_links = links[indices]
         batch_emb = None if emb is None else emb[curr_links].to(device)
 
         if args.use_struct_feature:
