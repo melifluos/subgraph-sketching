@@ -114,7 +114,7 @@ def get_buddy_preds(model, loader, device, args, split=None):
     else:
         emb = None
     for batch_count, indices in enumerate(tqdm(loader)):
-        curr_links = links[indices].to(device)
+        curr_links = links[indices]
         batch_emb = None if emb is None else emb[curr_links].to(device)
         if args.use_struct_feature:
             subgraph_features = data.subgraph_features[indices].to(device)
