@@ -54,10 +54,34 @@ To run experiments
 ```
 cd src
 python runners/run.py --dataset Cora --model ELPH
-python runners/run.py --dataset Citeseer --model ELPH
 python runners/run.py --dataset Cora --model BUDDY
+python runners/run.py --dataset Citeseer --model ELPH
 python runners/run.py --dataset Citeseer --model BUDDY
+python runners/run.py --dataset Pubmed --max_hash_hops 3 --feature_dropout 0.2 --model ELPH
+python runners/run.py --dataset Pubmed --max_hash_hops 3 --feature_dropout 0.2 --model BUDDY
+python runners/run.py --dataset ogbl-collab --feature_dropout 0.05 --label_dropout 0.1 --year 2007 --model ELPH
+python runners/run.py --dataset ogbl-collab --feature_dropout 0.05 --label_dropout 0.1 --year 2007 --model BUDDY
+python runners/run.py --dataset ogbl-ppa --label_dropout 0.1 --use_RA --model ELPH
+python runners/run.py --dataset ogbl-ppa --label_dropout 0.1 --use_RA --model BUDDY
+python runners/run.py --dataset ogbl-ddi --train_node_embedding --propagate_embeddings --epochs 120 --num_negs 6 --model ELPH
+python runners/run.py --dataset ogbl-ddi --train_node_embedding --propagate_embeddings --epochs 120 --num_negs 6 --model BUDDY
+python runners/run.py --dataset ogbl-citation2 --hidden_channels 128 --num_negs 5 --sign_dropout 0.2 --sign_k 3 --model ELPH
+python runners/run.py --dataset ogbl-citation2 --hidden_channels 128 --num_negs 5 --sign_dropout 0.2 --sign_k 3 --model BUDDY
 ```
+You may need to adjust 
+```
+--batch_size
+```
+and 
+```
+--eval_batch_size
+```
+based on available (GPU) memory
+Most of the runtime of BUDDY is building hashes and subgraph features. If you intend to run BUDDY more than once, then set the flag
+```
+--cache_subgraph_features
+```
+to store subgraph features on disk and read them if previously cached.
 
 ### Dataset and Preprocessing
 
