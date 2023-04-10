@@ -79,14 +79,8 @@ python runners/run.py --dataset ogbl-citation2 --hidden_channels 128 --num_negs 
 ```
 You may need to adjust 
 ```
---batch_size
-```
-```--num_workers```
-and 
-```
---eval_batch_size
-```
-based on available (GPU) memory.
+--batch_size``` ```--num_workers``` and ```--eval_batch_size```
+based on available (GPU) memory and CPU cores.
 
 Most of the runtime of BUDDY is building hashes and subgraph features. If you intend to run BUDDY more than once, then set the flag
 ```
