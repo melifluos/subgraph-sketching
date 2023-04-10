@@ -54,13 +54,14 @@ pip install fast-pagerank wandb datasketch ogb
 
 
 if you are unfamiliar with wandb, quickstart instructions are
-[pip install wandb](https://docs.wandb.ai/quickstart)
+[wandb quickstart](https://docs.wandb.ai/quickstart)
 
 
 ### Experiments
 To run experiments
 ```
-cd src
+cd subgraph-sketching/src
+conda activate ss
 python runners/run.py --dataset Cora --model ELPH
 python runners/run.py --dataset Cora --model BUDDY
 python runners/run.py --dataset Citeseer --model ELPH
@@ -80,6 +81,7 @@ You may need to adjust
 ```
 --batch_size
 ```
+```--num_workers```
 and 
 ```
 --eval_batch_size
