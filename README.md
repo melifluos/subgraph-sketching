@@ -4,7 +4,15 @@
 
 This is a reimplementation of the code used for "Graph Neural Networks for Link Prediction with Subgraph Sketching" https://openreview.net/pdf?id=m1oqEOAozQU which was accepted for oral presentation (top 5% of accepted papers) at ICLR 2023.
 
-The high level structure of the code will not change, but some details such as default parameter setting remain work in progress
+The high level structure of the code will not change, but some details such as default parameter settings remain work in progress.
+
+## Dataset and Preprocessing
+
+Create a root level folder
+```
+./dataset
+``` 
+Datasets will automatically be downloaded to this folder provided you are connected to the internet.
 
 ## Running experiments
 
@@ -23,7 +31,7 @@ torch-sparse==0.6.17+pt113cpu
 torch-spline-conv==1.2.2+pt113cpu
 
 
-Example commands to install the dependencies in a new conda environment (tested on Linux machine without GPU).
+Example commands to install the dependencies in a new conda environment (tested on a Linux machine without GPU).
 ```
 conda create --name ss python=3.9
 conda activate ss
@@ -76,19 +84,14 @@ and
 ```
 --eval_batch_size
 ```
-based on available (GPU) memory
+based on available (GPU) memory.
+
 Most of the runtime of BUDDY is building hashes and subgraph features. If you intend to run BUDDY more than once, then set the flag
 ```
 --cache_subgraph_features
 ```
 to store subgraph features on disk and read them if previously cached.
 
-### Dataset and Preprocessing
-
-Create a root level folder
-```
-./dataset
-``` 
 
 ## Cite us
 If you found this work useful, please cite our paper
