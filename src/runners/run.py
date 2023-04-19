@@ -237,5 +237,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if (args.max_hash_hops == 1) and (not args.use_zero_one):
         print("WARNING: (0,1) feature knock out is not supported for 1 hop. Running with all features")
+    if args.dataset_name == 'ogbl-ddi':
+        args.use_feature = 0  # dataset has no features
+        assert args.sign_k > 0, '--sign_k must be set to > 0 i.e. 1,2 or 3 for ogbl-ddi'
     print(args)
     run(args)
