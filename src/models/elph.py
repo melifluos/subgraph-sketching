@@ -299,10 +299,7 @@ class BUDDY(torch.nn.Module):
         @return: torch tensor [batch_size, hidden_dim]
         """
         if self.sign_k != 0:
-            if self.propagate_embeddings:  # used for DDI
-                x = self.sign_embedding(x)
-            else:
-                x = self.sign(x)
+            x = self.sign(x)
         else:
             x = self.lin_feat(x)
         x = x[:, 0, :] * x[:, 1, :]
