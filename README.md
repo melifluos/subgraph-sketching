@@ -71,8 +71,8 @@ python runners/run.py --dataset Pubmed --max_hash_hops 3 --feature_dropout 0.2 -
 python runners/run.py --dataset ogbl-collab --feature_dropout 0.05 --label_dropout 0.1 --year 2007 --model ELPH
 python runners/run.py --dataset ogbl-collab --feature_dropout 0.05 --label_dropout 0.1 --year 2007 --model BUDDY
 python runners/run.py --dataset ogbl-ppa --label_dropout 0.1 --use_RA 1 --lr 0.03 --epochs 100 --model BUDDY
-python runners/run.py --dataset ogbl-ddi --train_node_embedding --propagate_embeddings --epochs 120 --num_negs 6 --use_feature 0 --sign_k 2 --model ELPH
-python runners/run.py --dataset ogbl-ddi --train_node_embedding --propagate_embeddings --epochs 120 --num_negs 6 --use_feature 0 --sign_k 2 --model BUDDY
+python runners/run.py --dataset ogbl-ddi --train_node_embedding --propagate_embeddings --epochs 150 --hidden_channels 256 --lr 0.0015 --num_negs 6 --use_feature 0 --sign_k 2 --model ELPH
+python runners/run.py --dataset ogbl-ddi --train_node_embedding --propagate_embeddings --epochs 150 --hidden_channels 256 --lr 0.0015 --num_negs 6 --use_feature 0 --sign_k 2 --model BUDDY
 python runners/run.py --dataset ogbl-citation2 --hidden_channels 128 --num_negs 5 --sign_dropout 0.2 --sign_k 3 --model BUDDY
 ```
 You may need to adjust 
