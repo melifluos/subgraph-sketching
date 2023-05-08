@@ -136,8 +136,8 @@ class ElphHashes(object):
 
     def build_hash_tables(self, num_nodes, edge_index):
         """
-        Generate a hashing table that allows the size of the intersection of two nodes neighbours and 2-hop neighbour to be
-        calculated in constant time
+        Generate a hashing table that allows the size of the intersection of two nodes k-hop neighbours to be
+        estimated in constant time
         @param num_nodes: The number of nodes in the graph
         @param adj: Int Tensor [2, edges] edges in the graph
         @return: hashes, cards. Hashes is a dictionary{dictionary}{tensor} with keys num_hops, 'hll' or 'minhash', cards
@@ -310,6 +310,6 @@ class ElphHashes(object):
                 features[:, 5] = 0
                 features[:, 11] = 0
                 features[:, 12] = 0
-        if self.floor_sf:  # strictly necessary, but in practice makes no difference
+        if self.floor_sf:  # should be more accurate, but in practice makes no difference
             features[features < 0] = 0
         return features
