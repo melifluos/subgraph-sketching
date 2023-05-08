@@ -72,7 +72,6 @@ class ELPHDatasetTests(unittest.TestCase):
         self.args.model = 'BUDDY'
         split = 'test'
         ei = self.edge_index
-        data = Data(self.x, ei)
         root = f'{ROOT_DIR}/test/dataset/test_HashedDynamicDataset'
         hash_name = f'{root}{split}_hashcache.pt'
         cards_name = f'{root}{split}_cardcache.pt'

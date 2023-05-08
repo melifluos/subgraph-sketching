@@ -5,29 +5,19 @@ tests for the BUDDY model
 import unittest
 from argparse import Namespace
 
-import numpy as np
-from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import add_self_loops, to_undirected
-from torch_geometric.data import Data
 from torch_geometric.utils.random import barabasi_albert_graph
 from torch.utils.data import DataLoader
-from tqdm import tqdm
 import torch
 import scipy.sparse as ssp
-# from datasketch import MinHash, HyperLogLogPlusPlus
-from torch_scatter import scatter_min
 
-from runners.train import train_elph
-from runners.inference import get_buddy_preds
+from src.runners.inference import get_buddy_preds
+from src.runners.run import run
+from src.runners.train import train_buddy
 from test_params import OPT, setup_seed
-from models.elph import BUDDY, LinkPredictor
-from utils import ROOT_DIR, select_embedding
-from datasets.elph import HashDataset
-from hashing import ElphHashes
-from runners.run import run
-from datasets.elph import get_src_dst_degree
-from data import get_data, get_hashed_train_val_test_datasets
-from runners.train import train_buddy
+from src.models.elph import BUDDY
+from src.datasets.elph import get_src_dst_degree
+from src.data import get_data, get_hashed_train_val_test_datasets
 
 class BUDDYTests(unittest.TestCase):
     def setUp(self):
