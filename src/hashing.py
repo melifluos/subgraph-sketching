@@ -11,6 +11,7 @@ from pandas.util import hash_array
 from datasketch import HyperLogLogPlusPlus, hyperloglog_const
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import add_self_loops
+from torch_geometric.loader import DataLoader
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -253,63 +254,69 @@ class ElphHashes(object):
             raise ValueError('source and destination hash value shapes must be the same')
         return torch.count_nonzero(src == dst, dim=-1) / self.num_perm
 
-    def get_subgraph_features(self, links, hash_table, cards):
+    def get_subgraph_features(self, links, hash_table, cards, batch_size=11000000):
         """
         extracts the features that play a similar role to the labeling trick features. These can be thought of as approximations
         of path distances from the source and destination nodes. There are k+2+\sum_1^k 2k features
         @param links: tensor [n_edges, 2]
         @param hash_table: A Dict{Dict} of torch tensor [num_nodes, hash_size] keys are hop index and hash type (hyperlogloghash, minhash)
         @param cards: Tensor[n_nodes, max_hops] of hll neighbourhood cardinality estimates
+        @param batch_size: batch size for computing intersections. 11m splits the large ogb datasets into 3.
         @return: Tensor[n_edges, max_hops(max_hops+2)]
         """
         if links.dim() == 1:
             links = links.unsqueeze(0)
-        intersections = self._get_intersections(links, hash_table)
-        cards1, cards2 = cards.to(links.device)[links[:, 0]], cards.to(links.device)[links[:, 1]]
-        features = torch.zeros((len(links), self.max_hops * (self.max_hops + 2)), dtype=float, device=links.device)
-        features[:, 0] = intersections[(1, 1)]
-        if self.max_hops == 1:
-            features[:, 1] = cards2[:, 0] - features[:, 0]
-            features[:, 2] = cards1[:, 0] - features[:, 0]
-        elif self.max_hops == 2:
-            features[:, 1] = intersections[(2, 1)] - features[:, 0]  # (2,1)
-            features[:, 2] = intersections[(1, 2)] - features[:, 0]  # (1,2)
-            features[:, 3] = intersections[(2, 2)] - features[:, 0] - features[:, 1] - features[:, 2]  # (2,2)
-            features[:, 4] = cards2[:, 0] - torch.sum(features[:, 0:2], dim=1)  # (0, 1)
-            features[:, 5] = cards1[:, 0] - features[:, 0] - features[:, 2]  # (1, 0)
-            features[:, 6] = cards2[:, 1] - torch.sum(features[:, 0:5], dim=1)  # (0, 2)
-            features[:, 7] = cards1[:, 1] - features[:, 0] - torch.sum(features[:, 0:4], dim=1) - features[:,
-                                                                                                  5]  # (2, 0)
-        elif self.max_hops == 3:
-            features[:, 1] = intersections[(2, 1)] - features[:, 0]  # (2,1)
-            features[:, 2] = intersections[(1, 2)] - features[:, 0]  # (1,2)
-            features[:, 3] = intersections[(2, 2)] - features[:, 0] - features[:, 1] - features[:, 2]  # (2,2)
-            features[:, 4] = intersections[(3, 1)] - features[:, 0] - features[:, 1]  # (3,1)
-            features[:, 5] = intersections[(1, 3)] - features[:, 0] - features[:, 2]  # (1, 3)
-            features[:, 6] = intersections[(3, 2)] - torch.sum(features[:, 0:4], dim=1) - features[:, 4]  # (3,2)
-            features[:, 7] = intersections[(2, 3)] - torch.sum(features[:, 0:4], dim=1) - features[:, 5]  # (2,3)
-            features[:, 8] = intersections[(3, 3)] - torch.sum(features[:, 0:8], dim=1)  # (3,3)
-            features[:, 9] = cards2[:, 0] - features[:, 0] - features[:, 1] - features[:, 4]  # (0, 1)
-            features[:, 10] = cards1[:, 0] - features[:, 0] - features[:, 2] - features[:, 5]  # (1, 0)
-            features[:, 11] = cards2[:, 1] - torch.sum(features[:, 0:5], dim=1) - features[:, 6] - features[:,
-                                                                                                   9]  # (0, 2)
-            features[:, 12] = cards1[:, 1] - torch.sum(features[:, 0:5], dim=1) - features[:, 7] - features[:,
-                                                                                                   10]  # (2, 0)
-            features[:, 13] = cards2[:, 2] - torch.sum(features[:, 0:9], dim=1) - features[:, 9] - features[:,
-                                                                                                   11]  # (0, 3)
-            features[:, 14] = cards1[:, 2] - torch.sum(features[:, 0:9], dim=1) - features[:, 10] - features[:,
-                                                                                                    12]  # (3, 0)
-        else:
-            raise NotImplementedError("Only 1, 2 and 3 hop hashes are implemented")
-        if not self.use_zero_one:
-            if self.max_hops == 2:  # for two hops any positive edge that's dist 1 from u must be dist 2 from v etc.
-                features[:, 4] = 0
-                features[:, 5] = 0
-            elif self.max_hops == 3:  # in addition for three hops 0,2 is impossible for positive edges
-                features[:, 4] = 0
-                features[:, 5] = 0
-                features[:, 11] = 0
-                features[:, 12] = 0
-        if self.floor_sf:  # should be more accurate, but in practice makes no difference
-            features[features < 0] = 0
+        link_loader = DataLoader(range(links.size(0)), batch_size, shuffle=False, num_workers=0)
+        all_features = []
+        for batch in link_loader:
+            intersections = self._get_intersections(links[batch], hash_table)
+            cards1, cards2 = cards.to(links.device)[links[batch, 0]], cards.to(links.device)[links[batch, 1]]
+            features = torch.zeros((len(batch), self.max_hops * (self.max_hops + 2)), dtype=float, device=links.device)
+            features[:, 0] = intersections[(1, 1)]
+            if self.max_hops == 1:
+                features[:, 1] = cards2[:, 0] - features[:, 0]
+                features[:, 2] = cards1[:, 0] - features[:, 0]
+            elif self.max_hops == 2:
+                features[:, 1] = intersections[(2, 1)] - features[:, 0]  # (2,1)
+                features[:, 2] = intersections[(1, 2)] - features[:, 0]  # (1,2)
+                features[:, 3] = intersections[(2, 2)] - features[:, 0] - features[:, 1] - features[:, 2]  # (2,2)
+                features[:, 4] = cards2[:, 0] - torch.sum(features[:, 0:2], dim=1)  # (0, 1)
+                features[:, 5] = cards1[:, 0] - features[:, 0] - features[:, 2]  # (1, 0)
+                features[:, 6] = cards2[:, 1] - torch.sum(features[:, 0:5], dim=1)  # (0, 2)
+                features[:, 7] = cards1[:, 1] - features[:, 0] - torch.sum(features[:, 0:4], dim=1) - features[:,
+                                                                                                      5]  # (2, 0)
+            elif self.max_hops == 3:
+                features[:, 1] = intersections[(2, 1)] - features[:, 0]  # (2,1)
+                features[:, 2] = intersections[(1, 2)] - features[:, 0]  # (1,2)
+                features[:, 3] = intersections[(2, 2)] - features[:, 0] - features[:, 1] - features[:, 2]  # (2,2)
+                features[:, 4] = intersections[(3, 1)] - features[:, 0] - features[:, 1]  # (3,1)
+                features[:, 5] = intersections[(1, 3)] - features[:, 0] - features[:, 2]  # (1, 3)
+                features[:, 6] = intersections[(3, 2)] - torch.sum(features[:, 0:4], dim=1) - features[:, 4]  # (3,2)
+                features[:, 7] = intersections[(2, 3)] - torch.sum(features[:, 0:4], dim=1) - features[:, 5]  # (2,3)
+                features[:, 8] = intersections[(3, 3)] - torch.sum(features[:, 0:8], dim=1)  # (3,3)
+                features[:, 9] = cards2[:, 0] - features[:, 0] - features[:, 1] - features[:, 4]  # (0, 1)
+                features[:, 10] = cards1[:, 0] - features[:, 0] - features[:, 2] - features[:, 5]  # (1, 0)
+                features[:, 11] = cards2[:, 1] - torch.sum(features[:, 0:5], dim=1) - features[:, 6] - features[:,
+                                                                                                       9]  # (0, 2)
+                features[:, 12] = cards1[:, 1] - torch.sum(features[:, 0:5], dim=1) - features[:, 7] - features[:,
+                                                                                                       10]  # (2, 0)
+                features[:, 13] = cards2[:, 2] - torch.sum(features[:, 0:9], dim=1) - features[:, 9] - features[:,
+                                                                                                       11]  # (0, 3)
+                features[:, 14] = cards1[:, 2] - torch.sum(features[:, 0:9], dim=1) - features[:, 10] - features[:,
+                                                                                                        12]  # (3, 0)
+            else:
+                raise NotImplementedError("Only 1, 2 and 3 hop hashes are implemented")
+            if not self.use_zero_one:
+                if self.max_hops == 2:  # for two hops any positive edge that's dist 1 from u must be dist 2 from v etc.
+                    features[:, 4] = 0
+                    features[:, 5] = 0
+                elif self.max_hops == 3:  # in addition for three hops 0,2 is impossible for positive edges
+                    features[:, 4] = 0
+                    features[:, 5] = 0
+                    features[:, 11] = 0
+                    features[:, 12] = 0
+            if self.floor_sf:  # should be more accurate, but in practice makes no difference
+                features[features < 0] = 0
+            all_features.append(features)
+        features = torch.cat(all_features, dim=0)
         return features

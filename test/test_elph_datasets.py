@@ -6,16 +6,15 @@ from argparse import Namespace
 import os
 
 import torch
-from torch import tensor
 from torch_geometric.data import Data
 from torch.utils.data import DataLoader
 from torch_geometric.utils.random import barabasi_albert_graph
 import scipy.sparse as ssp
 
-from datasets.elph import HashDataset, make_train_eval_data
+from src.datasets.elph import HashDataset, make_train_eval_data
 from test_params import OPT
-from utils import ROOT_DIR
-from hashing import ElphHashes
+from src.utils import ROOT_DIR
+from src.hashing import ElphHashes
 
 
 class ELPHDatasetTests(unittest.TestCase):

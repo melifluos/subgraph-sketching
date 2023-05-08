@@ -12,8 +12,8 @@ import scipy.sparse as ssp
 import torch
 from datasketch import MinHash, HyperLogLogPlusPlus
 
-from hashing import ElphHashes, LABEL_LOOKUP
-from datasets.seal import neighbors
+from src.hashing import ElphHashes, LABEL_LOOKUP
+from src.datasets.seal import neighbors
 from test_params import OPT, setup_seed
 
 

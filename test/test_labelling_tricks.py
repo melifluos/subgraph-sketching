@@ -5,7 +5,7 @@ from torch import tensor
 import scipy.sparse as ssp
 import numpy as np
 
-from labelling_tricks import de_plus_node_labeling, de_node_labeling, drnl_node_labeling, drnl_hash_function, \
+from src.labelling_tricks import de_plus_node_labeling, de_node_labeling, drnl_node_labeling, drnl_hash_function, \
     get_drnl_lookup
 
 

@@ -11,8 +11,8 @@ from torch_geometric.data import Data
 from torch_geometric.utils import to_undirected, is_undirected
 from ogb.linkproppred import PygLinkPropPredDataset
 
-from data import get_data, get_ogb_train_negs, make_obg_supervision_edges, get_ogb_data, get_loaders
-from utils import ROOT_DIR, get_pos_neg_edges
+from src.data import get_data, get_ogb_train_negs, make_obg_supervision_edges, get_ogb_data, get_loaders
+from src.utils import ROOT_DIR, get_pos_neg_edges
 from test_params import OPT
 
 

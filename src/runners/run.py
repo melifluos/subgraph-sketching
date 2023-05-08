@@ -214,6 +214,9 @@ if __name__ == '__main__':
     parser.add_argument('--hll_p', type=int, default=8, help='the hyperloglog p parameter')
     parser.add_argument('--minhash_num_perm', type=int, default=128, help='the number of minhash perms')
     parser.add_argument('--max_hash_hops', type=int, default=2, help='the maximum number of hops to hash')
+    parser.add_argument('--subgraph_feature_batch_size', type=int, default=11000000,
+                        help='the number of edges to use in each batch when calculating subgraph features. '
+                             'Reduce or this or increase system RAM if seeing killed messages for large graphs')
     # wandb settings
     parser.add_argument('--wandb', action='store_true', help="flag if logging to wandb")
     parser.add_argument('--wandb_offline', dest='use_wandb_offline',
