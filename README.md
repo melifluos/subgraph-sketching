@@ -1,4 +1,4 @@
-# subgraph-sketching (Work in Progress)
+# subgraph-sketching 
 
 ## Introduction
 
@@ -53,7 +53,7 @@ pip install fast-pagerank wandb datasketch ogb
 ```
 
 
-if you are unfamiliar with wandb, quickstart instructions are
+if you are unfamiliar with wandb, see
 [wandb quickstart](https://docs.wandb.ai/quickstart)
 
 
