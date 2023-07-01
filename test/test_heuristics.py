@@ -15,7 +15,7 @@ from torch import tensor
 import scipy.sparse as ssp
 import numpy as np
 
-from heuristics import AA, PPR, CN, RA
+from src.heuristics import AA, PPR, CN, RA
 
 
 class HeuristicTests(unittest.TestCase):
@@ -26,7 +26,7 @@ class HeuristicTests(unittest.TestCase):
         self.num_nodes = 3
         self.neg_test_edges = tensor([[0, 1], [2, 0]]).t()
         self.A = ssp.csr_matrix((self.edge_weight, (self.edge_index[:, 0], self.edge_index[:, 1])),
-                                shape=(self.num_nodes, self.num_nodes), dtype=np.float)
+                                shape=(self.num_nodes, self.num_nodes), dtype=float)
         # create a graph with 2 isomorphic nodes 2 & 3
         self.iso_edge_index = tensor([[2, 2, 3, 3, 4, 0], [1, 4, 1, 4, 0, 1]]).t()
         self.iso_edge_weight = torch.ones(self.iso_edge_index.size(0), dtype=int)

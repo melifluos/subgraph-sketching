@@ -204,7 +204,8 @@ class HashDataset(Dataset):
                     torch.save(hashes, hash_name)
             print('constructing subgraph features')
             start_time = time()
-            self.subgraph_features = self.elph_hashes.get_subgraph_features(self.links, hashes, cards)
+            self.subgraph_features = self.elph_hashes.get_subgraph_features(self.links, hashes, cards,
+                                                                            self.args.subgraph_feature_batch_size)
             print("Preprocessed subgraph features in: {:.2f} seconds".format(time() - start_time))
             assert self.subgraph_features.shape[0] == len(
                 self.links), 'subgraph features are a different shape link object. Delete subgraph features file and regenerate'

@@ -6,6 +6,7 @@ import time
 import warnings
 from math import inf
 import sys
+import random
 
 sys.path.insert(0, '..')
 
@@ -29,6 +30,18 @@ from src.wandb_setup import initialise_wandb
 from src.runners.train import get_train_func
 from src.runners.inference import test
 
+def set_seed(seed):
+    """
+    setting a random seed for reproducibility and in accordance with OGB rules
+    @param seed: an integer seed
+    @return: None
+    """
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 def run(args):
     args = initialise_wandb(args)
@@ -37,6 +50,7 @@ def run(args):
     results_list = []
     train_func = get_train_func(args)
     for rep in range(args.reps):
+        set_seed(rep)
         dataset, splits, directed, eval_metric = get_data(args)
         train_loader, train_eval_loader, val_loader, test_loader = get_loaders(args, dataset, splits, directed)
         if args.dataset_name.startswith('ogbl'):  # then this is one of the ogb link prediction datasets
@@ -214,6 +228,9 @@ if __name__ == '__main__':
     parser.add_argument('--hll_p', type=int, default=8, help='the hyperloglog p parameter')
     parser.add_argument('--minhash_num_perm', type=int, default=128, help='the number of minhash perms')
     parser.add_argument('--max_hash_hops', type=int, default=2, help='the maximum number of hops to hash')
+    parser.add_argument('--subgraph_feature_batch_size', type=int, default=11000000,
+                        help='the number of edges to use in each batch when calculating subgraph features. '
+                             'Reduce or this or increase system RAM if seeing killed messages for large graphs')
     # wandb settings
     parser.add_argument('--wandb', action='store_true', help="flag if logging to wandb")
     parser.add_argument('--wandb_offline', dest='use_wandb_offline',

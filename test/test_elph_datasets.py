@@ -6,16 +6,15 @@ from argparse import Namespace
 import os
 
 import torch
-from torch import tensor
 from torch_geometric.data import Data
 from torch.utils.data import DataLoader
 from torch_geometric.utils.random import barabasi_albert_graph
 import scipy.sparse as ssp
 
-from datasets.elph import HashDataset, make_train_eval_data
+from src.datasets.elph import HashDataset, make_train_eval_data
 from test_params import OPT
-from utils import ROOT_DIR
-from hashing import ElphHashes
+from src.utils import ROOT_DIR
+from src.hashing import ElphHashes
 
 
 class ELPHDatasetTests(unittest.TestCase):
@@ -66,6 +65,30 @@ class ELPHDatasetTests(unittest.TestCase):
         for sf, elem in zip(subgraph_features, dl):
             sf_test = elem[0]
             self.assertTrue(torch.all(torch.eq(sf, sf_test)))
+
+    def test_get_subgraph_features_batched(self):
+        batch_size = 3
+        torch.manual_seed(0)
+        self.args.model = 'BUDDY'
+        split = 'test'
+        ei = self.edge_index
+        root = f'{ROOT_DIR}/test/dataset/test_HashedDynamicDataset'
+        hash_name = f'{root}{split}_hashcache.pt'
+        cards_name = f'{root}{split}_cardcache.pt'
+        eh = ElphHashes(self.args)
+        if os.path.exists(hash_name) and os.path.exists(cards_name):
+            hashes = torch.load(hash_name)
+            cards = torch.load(cards_name)
+        else:
+            hashes, cards = eh.build_hash_tables(self.n_nodes, self.edge_index)
+            torch.save(hashes, hash_name)
+            torch.save(cards, cards_name)
+        all_edges = torch.cat([self.pos_edges, self.neg_edges], 0)
+        subgraph_features = eh.get_subgraph_features(all_edges, hashes, cards, batch_size=batch_size)
+        self.assertTrue(
+            subgraph_features.shape == (len(all_edges), self.args.max_hash_hops * (self.args.max_hash_hops + 2)))
+        sf2 = eh.get_subgraph_features(all_edges, hashes, cards)
+        self.assertTrue(torch.all(torch.eq(subgraph_features, sf2)))
 
     def test_preprocess_features(self):
         pass
