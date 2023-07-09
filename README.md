@@ -77,7 +77,7 @@ python runners/run.py --dataset ogbl-collab --K 50 --lr 0.02 --feature_dropout 0
 python runners/run.py --dataset ogbl-ppa --label_dropout 0.1 --use_feature 0 --use_RA 1 --lr 0.03 --epochs 100 --hidden_channels 256 --cache_subgraph_features --add_normed_features 1 --model BUDDY
 python runners/run.py --dataset ogbl-ddi --K 20 --train_node_embedding --propagate_embeddings --label_dropout 0.25 --epochs 150 --hidden_channels 256 --lr 0.0015 --num_negs 6 --use_feature 0 --sign_k 2 --batch_size 131072 --model ELPH
 python runners/run.py --dataset ogbl-ddi --K 20 --train_node_embedding --propagate_embeddings --label_dropout 0.25 --epochs 150 --hidden_channels 256 --lr 0.0015 --num_negs 6 --use_feature 0 --sign_k 2 --cache_subgraph_features --batch_size 131072 --model BUDDY
-python runners/run.py --dataset ogbl-citation2 --hidden_channels 128 --num_negs 5 --sign_dropout 0.2 --sign_k 3 --cache_subgraph_features --model BUDDY
+python runners/run.py --dataset ogbl-citation2 --hidden_channels 128 --num_negs 5 --lr 0.0005 --sign_dropout 0.2 --feature_dropout 0.7 --label_dropout 0.8 --sign_k 3 --batch_size 261424 --eval_batch_size 522848 --cache_subgraph_features --model BUDDY
 ```
 You may need to adjust 
 ```
