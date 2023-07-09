@@ -80,7 +80,7 @@ class HashDataset(Dataset):
             self.x = data.x
         else:
             self.x = self._preprocess_node_features(data, self.edge_index, self.edge_weight, args.sign_k)
-        if args.model != 'ELPH':  # ELPH does hashing and feature prop on the fly
+            # ELPH does hashing and feature prop on the fly
             # either set self.hashes or self.subgraph_features depending on cmd args
             self._preprocess_subgraph_features(self.edge_index.device, data.num_nodes, args.num_negs)
 

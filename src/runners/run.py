@@ -82,7 +82,7 @@ def run(args):
                                f'rep{rep}_epoch_time': time.time() - t0, 'epoch_step': epoch}
                     if args.wandb:
                         wandb.log(res_dic)
-                    to_print = f'Epoch: {epoch:02d}, Loss: {loss:.4f}, Train: {100 * train_res:.2f}%, Valid: ' \
+                    to_print = f'Epoch: {epoch:02d}, Best epoch: {best_epoch}, Loss: {loss:.4f}, Train: {100 * train_res:.2f}%, Valid: ' \
                                f'{100 * val_res:.2f}%, Test: {100 * test_res:.2f}%, epoch time: {time.time() - t0:.1f}'
                     print(key)
                     print(to_print)
@@ -91,8 +91,9 @@ def run(args):
         if args.reps > 1:
             test_acc_mean, val_acc_mean, train_acc_mean = np.mean(results_list, axis=0) * 100
             test_acc_std = np.sqrt(np.var(results_list, axis=0)[0]) * 100
+            val_acc_std = np.sqrt(np.var(results_list, axis=0)[1]) * 100
             wandb_results = {'test_mean': test_acc_mean, 'val_mean': val_acc_mean, 'train_mean': train_acc_mean,
-                             'test_acc_std': test_acc_std}
+                             'test_acc_std': test_acc_std, 'val_acc_std': val_acc_std}
             print(wandb_results)
             if args.wandb:
                 wandb.log(wandb_results)
@@ -194,7 +195,7 @@ if __name__ == '__main__':
     # Training settings
     parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--weight_decay', type=float, default=0, help='Weight decay for optimization')
-    parser.add_argument('--epochs', type=int, default=50)
+    parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--num_workers', type=int, default=4)
     parser.add_argument('--num_negs', type=int, default=1, help='number of negatives for each positive')
     parser.add_argument('--train_node_embedding', action='store_true',
@@ -221,7 +222,7 @@ if __name__ == '__main__':
                         choices=('hits', 'mrr', 'auc'))
     parser.add_argument('--K', type=int, default=100, help='the hit rate @K')
     # hash settings
-    parser.add_argument('--use_zero_one', type=str2bool,
+    parser.add_argument('--use_zero_one', type=str2bool, default=0,
                         help="whether to use the counts of (0,1) and (1,0) neighbors")
     parser.add_argument('--floor_sf', type=str2bool, default=0,
                         help='the subgraph features represent counts, so should not be negative. If --floor_sf the min is set to 0')
