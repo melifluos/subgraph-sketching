@@ -5,6 +5,8 @@ constructing the hashed data objects used by elph and buddy
 import os
 from time import time
 
+import pandas as pd
+import numpy as np
 import torch
 from torch_geometric.data import Dataset
 from torch_geometric.utils import to_undirected
@@ -12,6 +14,8 @@ from torch_sparse import coalesce
 import scipy.sparse as ssp
 import torch_sparse
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
+from grape.embedders import HyperSketching
+from grape import Graph
 
 from src.heuristics import RA
 from src.utils import ROOT_DIR, get_src_dst_degree, get_pos_neg_edges, get_same_source_negs
@@ -31,6 +35,7 @@ class HashDataset(Dataset):
             self.elph_hashes = ElphHashes(args)  # object for hash and subgraph feature operations
         self.split = split  # string: train, valid or test
         self.root = root
+        self.use_grape = args.use_grape
         self.pos_edges = pos_edges
         self.neg_edges = neg_edges
         self.use_coalesce = use_coalesce
@@ -197,15 +202,37 @@ class HashDataset(Dataset):
             else:
                 print('no hashes found on disk, constructing hashes...')
                 start_time = time()
-                hashes, cards = self.elph_hashes.build_hash_tables(num_nodes, self.edge_index)
+                if self.use_grape:
+                    sketching = HyperSketching(
+                        number_of_hops=2,
+                        precision=10,
+                        bits=6
+                    )
+                    n_nodes = max(self.edge_index[0].max(), self.edge_index[1].max()) + 1
+                    node_df = pd.DataFrame({'names': np.arange(n_nodes)})
+                    graph = Graph.from_pd(edges_df=pd.DataFrame(
+                        {'src': self.edge_index[0].cpu().numpy(), 'dst': self.edge_index[1].cpu().numpy()}),
+                        edge_src_column='src', edge_dst_column='dst', directed=False, node_df=node_df)
+                    breakpoint()
+                    sketching.fit(graph, return_dataframe=False)
+                    edge_df = sketching.get_sketching_from_edge_node_ids(graph, self.links[0], self.links[1])
+                else:
+                    hashes, cards = self.elph_hashes.build_hash_tables(num_nodes, self.edge_index)
                 print("Preprocessed hashes in: {:.2f} seconds".format(time() - start_time))
                 if self.load_hashes:
                     torch.save(cards, cards_name)
                     torch.save(hashes, hash_name)
             print('constructing subgraph features')
             start_time = time()
-            self.subgraph_features = self.elph_hashes.get_subgraph_features(self.links, hashes, cards,
-                                                                            self.args.subgraph_feature_batch_size)
+            if self.use_grape:
+                # use grape Tensor[n_edges, max_hops(max_hops+2)]
+                overlap = torch.tensor(edge_df[0].reshape(edge_df[0].shape[0], -1))
+                left = torch.tensor(edge_df[1].reshape(edge_df[0].shape[0], -1))
+                right = torch.tensor(edge_df[2].reshape(edge_df[0].shape[0], -1))
+                self.subgraph_features = torch.cat([overlap, left, right], dim=1)
+            else:
+                self.subgraph_features = self.elph_hashes.get_subgraph_features(self.links, hashes, cards,
+                                                                                self.args.subgraph_feature_batch_size)
             print("Preprocessed subgraph features in: {:.2f} seconds".format(time() - start_time))
             assert self.subgraph_features.shape[0] == len(
                 self.links), 'subgraph features are a different shape link object. Delete subgraph features file and regenerate'

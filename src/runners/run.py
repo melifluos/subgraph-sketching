@@ -160,6 +160,7 @@ if __name__ == '__main__':
                         help='write / read subgraph features from disk')
     parser.add_argument('--train_cache_size', type=int, default=inf, help='the number of training edges to cache')
     parser.add_argument('--year', type=int, default=0, help='filter training data from before this year')
+    parser.add_argument('--use_grape', action='store_true', help='use node features')
     # GNN settings
     parser.add_argument('--model', type=str, default='BUDDY')
     parser.add_argument('--hidden_channels', type=int, default=1024)
