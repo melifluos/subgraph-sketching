@@ -247,19 +247,17 @@ class BUDDY(torch.nn.Module):
             else:
                 self.sign = SIGN(num_features, args.hidden_channels, args.hidden_channels, args.sign_k,
                                  args.sign_dropout)
-        self.label_lin_layer = Linear(self.dim, self.dim)
-        if args.use_feature:
-            self.bn_feats = torch.nn.BatchNorm1d(args.hidden_channels)
+        self.label_lin_layer = Linear(self.dim, args.label_projection_dim)
         if self.node_embedding is not None:
             self.bn_embs = torch.nn.BatchNorm1d(args.hidden_channels)
-        self.bn_labels = torch.nn.BatchNorm1d(self.dim)
+        self.bn_labels = torch.nn.BatchNorm1d(args.label_projection_dim)
         self.bn_RA = torch.nn.BatchNorm1d(1)
-
         if args.use_feature:
+            self.bn_feats = torch.nn.BatchNorm1d(args.hidden_channels)
             self.lin_feat = Linear(num_features,
                                    args.hidden_channels)
             self.lin_out = Linear(args.hidden_channels, args.hidden_channels)
-        hidden_channels = self.dim + args.hidden_channels if self.use_feature else self.dim
+        hidden_channels = args.label_projection_dim + args.hidden_channels if self.use_feature else args.label_projection_dim
         if self.node_embedding is not None:
             self.lin_emb = Linear(args.hidden_channels,
                                   args.hidden_channels)

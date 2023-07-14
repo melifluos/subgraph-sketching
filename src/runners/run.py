@@ -30,6 +30,10 @@ from src.wandb_setup import initialise_wandb
 from src.runners.train import get_train_func
 from src.runners.inference import test
 
+def print_results_list(results_list):
+    for idx, res in enumerate(results_list):
+        print(f'repetition {idx}: test {res[0]:.2f}, val {res[1]:.2f}, train {res[2]:.2f}')
+
 def set_seed(seed):
     """
     setting a random seed for reproducibility and in accordance with OGB rules
@@ -88,20 +92,22 @@ def run(args):
                     print(to_print)
         if args.reps > 1:
             results_list.append([test_res, val_res, train_res])
-        if args.reps > 1:
-            test_acc_mean, val_acc_mean, train_acc_mean = np.mean(results_list, axis=0) * 100
-            test_acc_std = np.sqrt(np.var(results_list, axis=0)[0]) * 100
-            val_acc_std = np.sqrt(np.var(results_list, axis=0)[1]) * 100
-            wandb_results = {'test_mean': test_acc_mean, 'val_mean': val_acc_mean, 'train_mean': train_acc_mean,
-                             'test_acc_std': test_acc_std, 'val_acc_std': val_acc_std}
-            print(wandb_results)
-            if args.wandb:
-                wandb.log(wandb_results)
+            print_results_list(results_list)
+    if args.reps > 1:
+        test_acc_mean, val_acc_mean, train_acc_mean = np.mean(results_list, axis=0) * 100
+        test_acc_std = np.sqrt(np.var(results_list, axis=0)[0]) * 100
+        val_acc_std = np.sqrt(np.var(results_list, axis=0)[1]) * 100
+
+        wandb_results = {'test_mean': test_acc_mean, 'val_mean': val_acc_mean, 'train_mean': train_acc_mean,
+                         'test_acc_std': test_acc_std, 'val_acc_std': val_acc_std}
+        print(wandb_results)
         if args.wandb:
-            wandb.finish()
-        if args.save_model:
-            path = f'{ROOT_DIR}/saved_models/{args.dataset_name}'
-            torch.save(model.state_dict(), path)
+            wandb.log(wandb_results)
+    if args.wandb:
+        wandb.finish()
+    if args.save_model:
+        path = f'{ROOT_DIR}/saved_models/{args.dataset_name}'
+        torch.save(model.state_dict(), path)
 
 
 def select_model(args, dataset, emb, device):
@@ -163,6 +169,7 @@ if __name__ == '__main__':
     # GNN settings
     parser.add_argument('--model', type=str, default='BUDDY')
     parser.add_argument('--hidden_channels', type=int, default=1024)
+    parser.add_argument('--label_projection_dim', type=int, default=64)
     parser.add_argument('--batch_size', type=int, default=1024)
     parser.add_argument('--eval_batch_size', type=int, default=1000000,
                         help='eval batch size should be largest the GPU memory can take - the same is not necessarily true at training time')

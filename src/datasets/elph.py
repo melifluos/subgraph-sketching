@@ -230,13 +230,8 @@ class HashDataset(Dataset):
             subgraph_features = self.subgraph_features[idx]
         else:
             subgraph_features = torch.zeros(self.max_hash_hops * (2 + self.max_hash_hops))
-
         y = self.labels[idx]
-        if self.use_RA:
-            RA = self.A[src].dot(self.A_RA[dst].T)[0, 0]
-            RA = torch.tensor([RA], dtype=torch.float)
-        else:
-            RA = -1
+        RA = -1
         src_degree, dst_degree = get_src_dst_degree(src, dst, self.A, None)
         node_features = torch.cat([self.x[src].unsqueeze(dim=0), self.x[dst].unsqueeze(dim=0)], dim=0)
         return subgraph_features, node_features, src_degree, dst_degree, RA, y
