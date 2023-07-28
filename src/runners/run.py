@@ -239,7 +239,7 @@ if __name__ == '__main__':
                         action='store_true')  # https://docs.wandb.ai/guides/technical-faq
 
     parser.add_argument('--wandb_sweep', action='store_true',
-                        help="flag if sweeping")  # if not it picks up params in greed_params
+                        help="flag if sweeping")
     parser.add_argument('--wandb_watch_grad', action='store_true', help='allows gradient tracking in train function')
     parser.add_argument('--wandb_track_grad_flow', action='store_true')
 
