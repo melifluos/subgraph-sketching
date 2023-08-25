@@ -265,9 +265,9 @@ class HashedTrainEvalDataset(Dataset):
     Subset of the full training dataset used to get unbiased estimate of training performance for large datasets
     where otherwise training eval is a significant % of runtime
     """
-
     def __init__(
             self, links, labels, subgraph_features, RA, dataset):
+        super(HashedTrainEvalDataset, self).__init__()
         self.links = links
         self.labels = labels
         self.edge_index = dataset.edge_index

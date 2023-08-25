@@ -169,7 +169,7 @@ if __name__ == '__main__':
     # GNN settings
     parser.add_argument('--model', type=str, default='BUDDY')
     parser.add_argument('--hidden_channels', type=int, default=1024)
-    parser.add_argument('--label_projection_dim', type=int, default=64)
+    parser.add_argument('--label_projection_dim', type=int, default=32)
     parser.add_argument('--batch_size', type=int, default=1024)
     parser.add_argument('--eval_batch_size', type=int, default=1000000,
                         help='eval batch size should be largest the GPU memory can take - the same is not necessarily true at training time')

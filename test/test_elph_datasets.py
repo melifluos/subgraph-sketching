@@ -128,4 +128,6 @@ class ELPHDatasetTests(unittest.TestCase):
                           directed=False)
         train_eval_dataset = make_train_eval_data(self.args, hdd, self.n_nodes, n_pos_samples=n_pos_samples,
                                                   negs_per_pos=negs_per_pos)
+        loader = DataLoader(train_eval_dataset, batch_size=1, shuffle=False, num_workers=1)
+        self.assertTrue(len(loader) == (negs_per_pos + 1) * n_pos_samples)
         self.assertTrue(len(train_eval_dataset.RA) == (negs_per_pos + 1) * n_pos_samples)
