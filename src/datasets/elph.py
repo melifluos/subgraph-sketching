@@ -14,7 +14,7 @@ from torch_sparse import coalesce
 import scipy.sparse as ssp
 import torch_sparse
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
-from grape.embedders import HyperSketching
+from embiggen.embedders.ensmallen_embedders.hyper_sketching import HyperSketching
 from grape import Graph
 
 from src.heuristics import RA
