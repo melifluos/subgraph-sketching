@@ -5,21 +5,23 @@ constructing the hashed data objects used by elph and buddy
 import os
 from time import time
 
-import pandas as pd
 import numpy as np
+import pandas as pd
+import scipy.sparse as ssp
 import torch
+import torch_sparse
+from embiggen.embedders.ensmallen_embedders.hyper_sketching import \
+    HyperSketching
+from grape import Graph
 from torch_geometric.data import Dataset
+from torch_geometric.nn.conv.gcn_conv import gcn_norm
 from torch_geometric.utils import to_undirected
 from torch_sparse import coalesce
-import scipy.sparse as ssp
-import torch_sparse
-from torch_geometric.nn.conv.gcn_conv import gcn_norm
-from embiggen.embedders.ensmallen_embedders.hyper_sketching import HyperSketching
-from grape import Graph
 
-from src.heuristics import RA
-from src.utils import ROOT_DIR, get_src_dst_degree, get_pos_neg_edges, get_same_source_negs
 from src.hashing import ElphHashes
+from src.heuristics import RA
+from src.utils import (ROOT_DIR, get_pos_neg_edges, get_same_source_negs,
+                       get_src_dst_degree)
 
 
 class HashDataset(Dataset):
@@ -209,13 +211,15 @@ class HashDataset(Dataset):
                         bits=6
                     )
                     n_nodes = max(self.edge_index[0].max(), self.edge_index[1].max()) + 1
-                    node_df = pd.DataFrame({'names': np.arange(n_nodes)})
+                    node_df = pd.DataFrame({'name': np.arange(n_nodes)})
                     graph = Graph.from_pd(edges_df=pd.DataFrame(
                         {'src': self.edge_index[0].cpu().numpy(), 'dst': self.edge_index[1].cpu().numpy()}),
-                        edge_src_column='src', edge_dst_column='dst', directed=False, node_df=node_df)
-                    breakpoint()
-                    sketching.fit(graph, return_dataframe=False)
-                    edge_df = sketching.get_sketching_from_edge_node_ids(graph, self.links[0], self.links[1])
+                        edge_src_column='src', edge_dst_column='dst', directed=False, nodes_df=node_df)
+                    sketching.fit(graph)
+                    # edge_df is a dict with keys {"overlap": np.array,
+                    # "left_difference": np.array, "right_difference:" np.array}
+                    # double check cpu-> numpy offloading
+                    edge_df = sketching.get_edge_feature_from_edge_node_ids(graph, self.links[:, 0].cpu().numpy().astype(np.uint32), self.links[:, 1].cpu().numpy().astype(np.uint32))
                 else:
                     hashes, cards = self.elph_hashes.build_hash_tables(num_nodes, self.edge_index)
                 print("Preprocessed hashes in: {:.2f} seconds".format(time() - start_time))
@@ -226,9 +230,9 @@ class HashDataset(Dataset):
             start_time = time()
             if self.use_grape:
                 # use grape Tensor[n_edges, max_hops(max_hops+2)]
-                overlap = torch.tensor(edge_df[0].reshape(edge_df[0].shape[0], -1))
-                left = torch.tensor(edge_df[1].reshape(edge_df[0].shape[0], -1))
-                right = torch.tensor(edge_df[2].reshape(edge_df[0].shape[0], -1))
+                overlap = torch.tensor(edge_df["overlap"].reshape(edge_df["overlap"].shape[0], -1))
+                left = torch.tensor(edge_df["left_difference"].reshape(edge_df["left_difference"].shape[0], -1))
+                right = torch.tensor(edge_df["right_difference"].reshape(edge_df["right_difference"].shape[0], -1))
                 self.subgraph_features = torch.cat([overlap, left, right], dim=1)
             else:
                 self.subgraph_features = self.elph_hashes.get_subgraph_features(self.links, hashes, cards,
