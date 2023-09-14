@@ -5,11 +5,11 @@ import argparse
 import time
 import warnings
 from math import inf
-import sys
+import sys, os
 import random
 
 sys.path.insert(0, '..')
-
+sys.path.insert(0, os.getcwd()+'src')
 import numpy as np
 import torch
 from ogb.linkproppred import Evaluator
@@ -61,6 +61,7 @@ def run(args):
             evaluator = Evaluator(name=args.dataset_name)
         else:
             evaluator = Evaluator(name='ogbl-ppa')  # this sets HR@100 as the metric
+        # Cora: emb None
         emb = select_embedding(args, dataset.data.num_nodes, device)
         model, optimizer = select_model(args, dataset, emb, device)
         val_res = test_res = best_epoch = 0
