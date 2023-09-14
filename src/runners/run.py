@@ -8,12 +8,11 @@ from math import inf
 import sys
 import random
 
-sys.path.insert(0, '..')
+# sys.path.insert(0, '..')
 
 import numpy as np
 import torch
 from ogb.linkproppred import Evaluator
-
 torch.set_printoptions(precision=4)
 import wandb
 # when generating subgraphs the supervision edge is deleted, which triggers a SparseEfficiencyWarning, but this is

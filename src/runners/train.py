@@ -69,6 +69,7 @@ def train_buddy(model, optimizer, train_loader, args, device, emb=None):
             RA = None
         start_time = time.time()
         optimizer.zero_grad()
+
         logits = model(subgraph_features, node_features, degrees[:, 0], degrees[:, 1], RA, batch_emb)
         loss = get_loss(args.loss)(logits, labels[indices].squeeze(0).to(device))
 
@@ -206,6 +207,7 @@ def train_elph(model, optimizer, train_loader, args, device):
             subgraph_features = torch.zeros(data.subgraph_features[indices].shape).to(device)
         start_time = time.time()
         optimizer.zero_grad()
+        
         logits = model.predictor(subgraph_features, batch_node_features, batch_emb)
         loss = get_loss(args.loss)(logits, labels[indices].squeeze(0).to(device))
 
