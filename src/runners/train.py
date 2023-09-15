@@ -196,6 +196,7 @@ def train_elph(model, optimizer, train_loader, args, device):
         else:
             emb = None
         # get node features
+        # TODO replace x with word_embedding generated from LM
         node_features, hashes, cards = model(data.x.to(device), data.edge_index.to(device))
         curr_links = links[indices].to(device)
         batch_node_features = None if node_features is None else node_features[curr_links]
