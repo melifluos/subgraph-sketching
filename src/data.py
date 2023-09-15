@@ -20,7 +20,7 @@ from src.utils import ROOT_DIR, get_same_source_negs
 from src.lcc import get_largest_connected_component, remap_edges, get_node_mapper
 from src.datasets.seal import get_train_val_test_datasets
 from src.datasets.elph import get_hashed_train_val_test_datasets, make_train_eval_data
-
+import json
 
 def get_loaders(args, dataset, splits, directed):
     train_data, val_data, test_data = splits['train'], splits['valid'], splits['test']
