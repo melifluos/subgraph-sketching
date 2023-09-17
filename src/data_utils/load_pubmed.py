@@ -2,17 +2,20 @@ import numpy as np
 # adapted from https://github.com/jcatw/scnn
 import torch
 import random
+import os, sys
+sys.path.insert(0, os.getcwd()+'/src')
 from torch_geometric.datasets import Planetoid
 import torch_geometric.transforms as T
 from sklearn.preprocessing import normalize
 import json
 import pandas as pd
-
+# param
+from configs.config_load import update_cfg, cfg
 # return pubmed dataset as pytorch geometric Data object together with 60/20/20 split, and list of pubmed IDs
 
 
 def get_pubmed_casestudy(corrected=False, SEED=0):
-    _, data_X, data_Y, data_pubid, data_edges = parse_pubmed()
+    _, data_X, data_Y, data_pubid, data_edges = parse_pubmed(cfg)
     data_X = normalize(data_X, norm="l1")
 
     torch.manual_seed(SEED)
@@ -58,8 +61,8 @@ def get_pubmed_casestudy(corrected=False, SEED=0):
     return data, data_pubid
 
 
-def parse_pubmed():
-    path = 'dataset/PubMed_orig/data/'
+def parse_pubmed(cfg):
+    path = cfg.dataset.pubmed.original
 
     n_nodes = 19717
     n_features = 500
@@ -134,12 +137,12 @@ def parse_pubmed():
     return data_A, data_X, data_Y, data_pubid, np.unique(data_edges, axis=0).transpose()
 
 
-def get_raw_text_pubmed(use_text=False, seed=0):
+def get_raw_text_pubmed(cfg, use_text=False, seed=0):
     data, data_pubid = get_pubmed_casestudy(SEED=seed)
     if not use_text:
         return data, None
-
-    f = open('dataset/PubMed_orig/pubmed.json')
+    
+    f = open(cfg.dataset.pubmed.abs_ti)
     pubmed = json.load(f)
     df_pubmed = pd.DataFrame.from_dict(pubmed)
 
@@ -153,7 +156,8 @@ def get_raw_text_pubmed(use_text=False, seed=0):
 
 
 if __name__ == "__main__":
-    data, data_pubid = get_pubmed_casestudy()
-    data, text = get_raw_text_pubmed(use_text=True, seed=0)
+    cfg = update_cfg(cfg)
+    data, data_pubid = get_pubmed_casestudy(cfg.seed)
+    data, text = get_raw_text_pubmed(cfg, use_text=True, seed=0)
     print(data)
     print(text)

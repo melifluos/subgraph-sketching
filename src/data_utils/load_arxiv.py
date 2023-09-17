@@ -2,9 +2,12 @@ from ogb.nodeproppred import PygNodePropPredDataset
 import torch_geometric.transforms as T
 import torch
 import pandas as pd
+import os, sys 
+sys.path.insert(0, os.getcwd()+'/src')
+# param
+from configs.config_load import update_cfg, cfg
 
-
-def get_raw_text_arxiv(use_text=False, seed=0):
+def get_raw_text_arxiv(cfg, use_text=False, seed=0):
     dataset = PygNodePropPredDataset(
         name='ogbn-arxiv', transform=T.ToSparseTensor())
     data = dataset[0]
@@ -27,7 +30,7 @@ def get_raw_text_arxiv(use_text=False, seed=0):
     nodeidx2paperid = pd.read_csv(
         'dataset/ogbn_arxiv/mapping/nodeidx2paperid.csv.gz', compression='gzip')
 
-    raw_text = pd.read_csv('dataset/ogbn_arxiv_orig/titleabs.tsv',
+    raw_text = pd.read_csv(cfg.dataset.arxiv.abs_ti,
                            sep='\t', header=None, names=['paper id', 'title', 'abs'])
 
     # remove string paper id
@@ -43,6 +46,6 @@ def get_raw_text_arxiv(use_text=False, seed=0):
 
 
 if __name__ == '__main__':
-    data, text = get_raw_text_arxiv(use_text=True)
+    data, text = get_raw_text_arxiv(cfg, use_text=True)
     print(data)
     print(text)

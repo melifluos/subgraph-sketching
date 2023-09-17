@@ -16,7 +16,6 @@ from configs.config_load import update_cfg, cfg
 def get_cora_casestudy(SEED=0):
     data_X, data_Y, data_citeid, data_edges = parse_cora(cfg)
     # data_X = sklearn.preprocessing.normalize(data_X, norm="l1")
-    bp()
     torch.manual_seed(SEED)
     if torch.cuda.is_available():
         torch.cuda.manual_seed(SEED)
@@ -80,7 +79,7 @@ def parse_cora(cfg):
     return data_X, data_Y, data_citeid, np.unique(data_edges, axis=0).transpose()
 
 
-def get_raw_text_cora_from_rpo(use_text=False, seed=0):
+def get_raw_text_cora_from_rpo(cfg, use_text=False, seed=0):
     """adopted from repo: 
     https://github.com/XiaoxinHe/TAPE/blob/241c93b735dcebbe2853414395c1559d5c2ce202/core/data_utils/load_cora.py
     """
@@ -178,6 +177,7 @@ if __name__ == '__main__':
     cfg = update_cfg(cfg)
     data, data_citeid = get_cora_casestudy(cfg.seed)
     data, text = get_raw_text_cora(cfg, use_text=True)
+    data, text = get_raw_text_cora_from_rpo(cfg, use_text=False, seed=0)
     print(data)
     print(data_citeid)
     print(text)
