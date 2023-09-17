@@ -13,7 +13,7 @@
 			"console": "integratedTerminal",
 			"justMyCode": true, 
 			"cwd": "/pfs/work7/workspace/scratch/cc7738-prefeature/subgraph-sketching",
-			"args": ["--dataset_name", "Cora", "--model", "ELPH"]
+			"args": ["--dataset_name", "cora", "--model", "ELPH", "--seed", "0"]
 		}
 	]
 }
