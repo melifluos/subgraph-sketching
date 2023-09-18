@@ -5,7 +5,8 @@ import pandas as pd
 import os, sys 
 sys.path.insert(0, os.getcwd()+'/src')
 # param
-from configs.config_load import update_cfg, cfg
+from configs.config_load import cfg_data as cfg
+from configs.config_load import update_cfg
 
 def get_raw_text_arxiv(cfg, use_text=False, seed=0):
     dataset = PygNodePropPredDataset(
@@ -46,6 +47,8 @@ def get_raw_text_arxiv(cfg, use_text=False, seed=0):
 
 
 if __name__ == '__main__':
+    cfg = update_cfg(cfg)
+
     data, text = get_raw_text_arxiv(cfg, use_text=True)
     print(data)
     print(text)

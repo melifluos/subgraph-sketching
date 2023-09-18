@@ -5,11 +5,7 @@ import argparse
 import time
 import warnings
 from math import inf
-import sys, os
 import random
-
-sys.path.insert(0, '..')
-sys.path.insert(0, os.getcwd()+'src')
 import numpy as np
 import torch
 from ogb.linkproppred import Evaluator
@@ -18,7 +14,8 @@ import wandb
 # when generating subgraphs the supervision edge is deleted, which triggers a SparseEfficiencyWarning, but this is
 # not a performance bottleneck, so suppress for now
 from scipy.sparse import SparseEfficiencyWarning
-
+import sys
+sys.path.insert(0, '..')
 warnings.filterwarnings("ignore", category=SparseEfficiencyWarning)
 
 from src.data import get_data, get_loaders

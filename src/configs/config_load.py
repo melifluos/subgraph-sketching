@@ -3,7 +3,7 @@ import argparse
 from yacs.config import CfgNode as CN
 # adopted from torch_geometric.graphgym.config
 
-def set_cfg(cfg):
+def set_data_cfg(cfg):
 
 	# ------------------------------------------------------------------------ #
 	# Basic options
@@ -70,4 +70,4 @@ def update_cfg(cfg, args_str=None):
 """
     Global variable
 """
-cfg = set_cfg(CN())
+cfg_data = set_data_cfg(CN())

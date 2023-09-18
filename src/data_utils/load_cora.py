@@ -8,8 +8,8 @@ from torch_geometric.datasets import Planetoid
 import torch_geometric.transforms as T
 from pdb import set_trace as bp
 # param
-from configs.config_load import update_cfg, cfg
-
+from configs.config_load import cfg_data as cfg
+from configs.config_load import update_cfg
 # return cora dataset as pytorch geometric Data object together with 60/20/20 split, and list of cora IDs
 
 
