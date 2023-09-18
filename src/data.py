@@ -22,6 +22,17 @@ from src.datasets.seal import get_train_val_test_datasets
 from src.datasets.elph import get_hashed_train_val_test_datasets, make_train_eval_data
 import json
 from pdb import set_trace as bp
+from yacs.config import CfgNode
+from configs.config_load import cfg_data as cfg
+from configs.config_load import update_cfg
+import os.path as osp
+from typing import Callable, List, Optional
+
+import numpy as np
+import torch
+
+from torch_geometric.data import InMemoryDataset, download_url
+from torch_geometric.io import read_planetoid_data
 
 def get_loaders(args, dataset, splits, directed):
     train_data, val_data, test_data = splits['train'], splits['valid'], splits['test']
@@ -82,12 +93,7 @@ def get_data(args):
     eval_metric = 'hits'
     path = os.path.join(ROOT_DIR, 'dataset', dataset_name)
     print(f'reading data from: {path}')
-    bp()
-    if use_text and dataset_name in {'cora', 'pubmed', 'arxiv'}:
-        dataset, text = get_raw_text(dataset_name)
-        dataset.text = text
-        # return one dataloder in the same form as Planetoid
-        
+
     if dataset_name.startswith('ogbl'):
         use_lcc_flag = False
         dataset = PygLinkPropPredDataset(name=dataset_name, root=path)
@@ -95,8 +101,8 @@ def get_data(args):
             dataset.data.x = torch.ones((dataset.data.num_nodes, 1))
             dataset.data.edge_weight = torch.ones(dataset.data.edge_index.size(1), dtype=int)
     else:
-        bp() # make sure which one is using this function 
-        dataset = Planetoid(path, dataset_name)
+        # cora, pubmed, arxiv all use this
+        dataset = text_graph_loader(path, dataset_name, use_text)
 
     # set the metric
     if dataset_name.startswith('ogbl-citation'):
@@ -262,3 +268,213 @@ def use_lcc(dataset):
     )
     dataset.data = data
     return dataset
+
+
+def text_graph_loader(path: str,
+                      dataset_name :str,
+                      use_text: bool):
+    if not use_text:
+        return Planetoid(path, dataset_name)
+    else:
+        return Textgraph(path, dataset_name, use_text=True)
+
+def load_data(cfg, dataset, use_text=False, use_gpt=False, seed=0):
+    if dataset == 'cora':
+        from  data_utils.load_cora import get_raw_text_cora as get_raw_text
+    elif dataset == 'pubmed':
+        from  data_utils.load_pubmed import get_raw_text_pubmed as get_raw_text
+    elif dataset == 'ogbn-arxiv':
+        from  data_utils.load_arxiv import get_raw_text_arxiv as get_raw_text
+    else:
+        exit(f'Error: Dataset {dataset} not supported')
+
+    # for training GNN
+    if not use_text:
+        data, _ = get_raw_text(use_text=False, seed=seed)
+        return data
+
+    # for finetuning LM
+    if use_gpt:
+        data, text = get_raw_text(use_text=False, seed=seed)
+        folder_path = 'gpt_responses/{}'.format(dataset)
+        print(f"using gpt: {folder_path}")
+        n = data.y.shape[0]
+        text = []
+        for i in range(n):
+            filename = str(i) + '.json'
+            file_path = os.path.join(folder_path, filename)
+            with open(file_path, 'r') as file:
+                json_data = json.load(file)
+                content = json_data['choices'][0]['message']['content']
+                text.append(content)
+    else:
+        data, text = get_raw_text(use_text=True, seed=seed)
+
+    return data, text
+
+
+class Textgraph(InMemoryDataset):
+    r"""The citation network datasets :obj:`"Cora"`, :obj:`"CiteSeer"` and
+    :obj:`"PubMed"` from the `"Revisiting Semi-Supervised Learning with Graph
+    Embeddings" <https://arxiv.org/abs/1603.08861>`_ paper.
+    Nodes represent documents and edges represent citation links.
+    Training, validation and test splits are given by binary masks.
+
+    Args:
+        root (str): Root directory where the dataset should be saved.
+        name (str): The name of the dataset (:obj:`"Cora"`, :obj:`"CiteSeer"`,
+            :obj:`"PubMed"`).
+        split (str, optional): The type of dataset split (:obj:`"public"`,
+            :obj:`"full"`, :obj:`"geom-gcn"`, :obj:`"random"`).
+            If set to :obj:`"public"`, the split will be the public fixed split
+            from the `"Revisiting Semi-Supervised Learning with Graph
+            Embeddings" <https://arxiv.org/abs/1603.08861>`_ paper.
+            If set to :obj:`"full"`, all nodes except those in the validation
+            and test sets will be used for training (as in the
+            `"FastGCN: Fast Learning with Graph Convolutional Networks via
+            Importance Sampling" <https://arxiv.org/abs/1801.10247>`_ paper).
+            If set to :obj:`"geom-gcn"`, the 10 public fixed splits from the
+            `"Geom-GCN: Geometric Graph Convolutional Networks"
+            <https://openreview.net/forum?id=S1e2agrFvS>`_ paper are given.
+            If set to :obj:`"random"`, train, validation, and test sets will be
+            randomly generated, according to :obj:`num_train_per_class`,
+            :obj:`num_val` and :obj:`num_test`. (default: :obj:`"public"`)
+        num_train_per_class (int, optional): The number of training samples
+            per class in case of :obj:`"random"` split. (default: :obj:`20`)
+        num_val (int, optional): The number of validation samples in case of
+            :obj:`"random"` split. (default: :obj:`500`)
+        num_test (int, optional): The number of test samples in case of
+            :obj:`"random"` split. (default: :obj:`1000`)
+        transform (callable, optional): A function/transform that takes in an
+            :obj:`torch_geometric.data.Data` object and returns a transformed
+            version. The data object will be transformed before every access.
+            (default: :obj:`None`)
+        pre_transform (callable, optional): A function/transform that takes in
+            an :obj:`torch_geometric.data.Data` object and returns a
+            transformed version. The data object will be transformed before
+            being saved to disk. (default: :obj:`None`)
+
+    **STATS:**
+
+    .. list-table::
+        :widths: 10 10 10 10 10
+        :header-rows: 1
+
+        * - Name
+          - #nodes
+          - #edges
+          - #features
+          - #classes
+        * - Cora
+          - 2,708
+          - 10,556
+          - 1,433
+          - 7
+        * - CiteSeer
+          - 3,327
+          - 9,104
+          - 3,703
+          - 6
+        * - PubMed
+          - 19,717
+          - 88,648
+          - 500
+          - 3
+    """
+    url = ''
+    geom_gcn_url = ('')
+
+    def __init__(self, cfg: CfgNode, root: str, name: str, use_text: bool = True, split: str = "public",
+                 num_train_per_class: int = 20, num_val: int = 500,
+                 num_test: int = 1000, transform: Optional[Callable] = None,
+                 pre_transform: Optional[Callable] = None):
+        self.name = name+'-text'
+        self.cfg = cfg
+        self.use_text = use_text
+        self.split = split.lower()
+        self.dataset_name = name
+        self.root = cfg.dataset.cora.root
+        self.lm_model_name = cfg.dataset.cora.lm_model_name
+        self.seed = cfg.seed
+        assert self.split in ['public', 'full', 'geom-gcn', 'random']
+
+        super().__init__(root, transform, pre_transform)
+        self.load(self.processed_paths[0])
+
+        if split == 'full':
+            data = self.get(0)
+            data.train_mask.fill_(True)
+            data.train_mask[data.val_mask | data.test_mask] = False
+            self.data, self.slices = self.collate([data])
+
+        elif split == 'random':
+            data = self.get(0)
+            data.train_mask.fill_(False)
+            for c in range(self.num_classes):
+                idx = (data.y == c).nonzero(as_tuple=False).view(-1)
+                idx = idx[torch.randperm(idx.size(0))[:num_train_per_class]]
+                data.train_mask[idx] = True
+
+            remaining = (~data.train_mask).nonzero(as_tuple=False).view(-1)
+            remaining = remaining[torch.randperm(remaining.size(0))]
+
+            data.val_mask.fill_(False)
+            data.val_mask[remaining[:num_val]] = True
+
+            data.test_mask.fill_(False)
+            data.test_mask[remaining[num_val:num_val + num_test]] = True
+
+            self.data, self.slices = self.collate([data])
+    @property
+    def raw_file_names(self) -> List[str]:
+        self.prt_lm = f"{self.root}/prt_lm/{self.dataset_name}/{self.lm_model_name}-seed{self.seed}.emb"
+        return [self.cfg.dataset.cora.original,
+        self.cfg.dataset.cora.papers,
+        self.cfg.dataset.cora.extractions,
+        self.prt_lm]
+
+    @property
+    def processed_file_names(self) -> str:
+        return 'data.pt'
+
+    def download(self):
+        pass
+
+    @property
+    def num_nodes(self) -> int:
+        return self.data.x.size(0)
+
+    def process(self):
+        # read data from text files
+        print("Loading pretrained LM features (title and abstract) ...")
+        data = load_data(self.cfg, self.dataset_name, use_text=False, seed=self.seed)
+        print(f"LM_emb_path: {self.prt_lmh}")
+        features = torch.from_numpy(np.array(
+            np.memmap(self.prt_lm, mode='r',
+                      dtype=np.float16,
+                      shape=(self.num_nodes, 768)))
+        ).to(torch.float32)
+        print(features.shape)
+
+        # split masks for geom-gcn
+        if self.split == 'geom-gcn':
+            train_masks, val_masks, test_masks = [], [], []
+            for i in range(10):
+                name = None
+                splits = None
+                train_masks = None
+                val_masks = None
+                test_masks = None
+            data.train_mask = torch.stack(train_masks, dim=1)
+            data.val_mask = torch.stack(val_masks, dim=1)
+            data.test_mask = torch.stack(test_masks, dim=1)
+
+        data = data if self.pre_transform is None else self.pre_transform(data)
+        self.save([data], self.processed_paths[0])
+
+    def __repr__(self) -> str:
+        return f'{self.name}()'
+
+
+if __name__ == "__main__":
+    Textgraph(cfg, 'dataset', 'cora', use_text=True)

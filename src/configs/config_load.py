@@ -22,6 +22,7 @@ def set_data_cfg(cfg):
 	cfg.dataset.cora.original = cfg.dataset.cora.root + '/dataset/cora_orig/cora'
 	cfg.dataset.cora.papers =  cfg.dataset.cora.root + '/dataset/cora_orig/mccallum/cora/papers'
 	cfg.dataset.cora.extractions =  cfg.dataset.cora.root + '/dataset/cora_andrew_mccallum/extractions/'
+	cfg.dataset.cora.lm_model_name = 'base'
 	# ------------------------------------------------------------------------ #
 	cfg.dataset.pubmed = CN()
 	cfg.dataset.pubmed.root = '/pfs/work7/workspace/scratch/cc7738-prefeature/TAPE' 
@@ -31,7 +32,8 @@ def set_data_cfg(cfg):
 	cfg.dataset.arxiv = CN()
 	cfg.dataset.arxiv.root = '/pfs/work7/workspace/scratch/cc7738-prefeature/TAPE'
 	cfg.dataset.arxiv.abs_ti = cfg.dataset.arxiv.root + '/dataset/ogbn_arxiv_orig/titleabs.tsv'
-    
+
+
 	return cfg
 
 
