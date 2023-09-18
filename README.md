@@ -12,9 +12,12 @@ The high level structure of the code will not change, but some details such as d
 
 ## Dataset and Preprocessing
 
-Create a root level folder
+Create a root level folder, for text-graph please refer to repository git@github.com:XiaoxinHe/TAPE.git 
 ```
 ./dataset
+python src/data_utils/load_arxiv.py
+python src/data_utils/load_cora.py
+python src/data_utils/load_pubmed.py
 ``` 
 Datasets will automatically be downloaded to this folder provided you are connected to the internet.
 

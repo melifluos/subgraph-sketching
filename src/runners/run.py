@@ -14,8 +14,9 @@ import wandb
 # when generating subgraphs the supervision edge is deleted, which triggers a SparseEfficiencyWarning, but this is
 # not a performance bottleneck, so suppress for now
 from scipy.sparse import SparseEfficiencyWarning
-import sys
+import sys, os
 sys.path.insert(0, '..')
+sys.path.insert(0, os.getcwd()+'/src')
 warnings.filterwarnings("ignore", category=SparseEfficiencyWarning)
 
 from src.data import get_data, get_loaders
@@ -57,7 +58,7 @@ def run(args):
             evaluator = Evaluator(name=args.dataset_name)
         else:
             evaluator = Evaluator(name='ogbl-ppa')  # this sets HR@100 as the metric
-        # Cora: emb None
+        
         emb = select_embedding(args, dataset.data.num_nodes, device)
         model, optimizer = select_model(args, dataset, emb, device)
         val_res = test_res = best_epoch = 0
@@ -144,8 +145,11 @@ if __name__ == '__main__':
     # Data settings
     parser = argparse.ArgumentParser(description='Efficient Link Prediction with Hashes (ELPH)')
     parser.add_argument('--dataset_name', type=str, default='Cora',
-                        choices=['Cora', 'Citeseer', 'Pubmed', 'ogbl-ppa', 'ogbl-collab', 'ogbl-ddi',
+                        choices=['cora', 'Citeseer', 'Pubmed', 'ogbl-ppa', 'ogbl-collab', 'ogbl-ddi',
                                  'ogbl-citation2'])
+    parser.add_argument('--use_text', type=bool, default=False,
+                        help='whether to use text features')
+    
     parser.add_argument('--val_pct', type=float, default=0.1,
                         help='the percentage of supervision edges to be used for validation. These edges will not appear'
                              ' in the training set and will only be used as message passing edges in the test set')

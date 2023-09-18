@@ -21,6 +21,7 @@ from src.lcc import get_largest_connected_component, remap_edges, get_node_mappe
 from src.datasets.seal import get_train_val_test_datasets
 from src.datasets.elph import get_hashed_train_val_test_datasets, make_train_eval_data
 import json
+from pdb import set_trace as bp
 
 def get_loaders(args, dataset, splits, directed):
     train_data, val_data, test_data = splits['train'], splits['valid'], splits['test']
@@ -69,9 +70,11 @@ def get_data(args):
     test supervision edges are disjoint from both val and train supervision edges
     :param args: arguments Namespace object
     :return: dataset, dic splits, bool directed, str eval_metric
+    # TODO add embedding for cora, arxiv, and pubmed for NLP method 
     """
     include_negatives = True
     dataset_name = args.dataset_name
+    use_text = args.use_text
     val_pct = args.val_pct
     test_pct = args.test_pct
     use_lcc_flag = True
@@ -79,6 +82,12 @@ def get_data(args):
     eval_metric = 'hits'
     path = os.path.join(ROOT_DIR, 'dataset', dataset_name)
     print(f'reading data from: {path}')
+    bp()
+    if use_text and dataset_name in {'cora', 'pubmed', 'arxiv'}:
+        dataset, text = get_raw_text(dataset_name)
+        dataset.text = text
+        # return one dataloder in the same form as Planetoid
+        
     if dataset_name.startswith('ogbl'):
         use_lcc_flag = False
         dataset = PygLinkPropPredDataset(name=dataset_name, root=path)
@@ -86,6 +95,7 @@ def get_data(args):
             dataset.data.x = torch.ones((dataset.data.num_nodes, 1))
             dataset.data.edge_weight = torch.ones(dataset.data.edge_index.size(1), dtype=int)
     else:
+        bp() # make sure which one is using this function 
         dataset = Planetoid(path, dataset_name)
 
     # set the metric
