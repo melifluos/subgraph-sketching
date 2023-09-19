@@ -3,15 +3,14 @@ import numpy as np
 import torch
 import random
 import os, sys
-sys.path.insert(0, os.getcwd()+'/src')
 from torch_geometric.datasets import Planetoid
 import torch_geometric.transforms as T
 from sklearn.preprocessing import normalize
 import json
 import pandas as pd
 # param
-from configs.config_load import cfg_data as cfg
-from configs.config_load import update_cfg
+from src.configs.config_load import cfg_data as cfg
+from src.configs.config_load import update_cfg
 # return pubmed dataset as pytorch geometric Data object together with 60/20/20 split, and list of pubmed IDs
 
 

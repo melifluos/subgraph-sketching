@@ -12,8 +12,8 @@
 			"program": "${file}",
 			"console": "integratedTerminal",
 			"justMyCode": true, 
-			"cwd": "/pfs/work7/workspace/scratch/cc7738-prefeature/subgraph-sketching",
-			"args": ["--dataset_name", "cora", "--model", "ELPH", "--use_text", "True"]
+			"cwd": "/pfs/work7/workspace/scratch/cc7738-prefeature/subgraph-sketching/src",
+			"args": ["--dataset_name", "ogbn-arxiv", "--model", "ELPH", "--use_text", "True"]
 		}
 	]
 }

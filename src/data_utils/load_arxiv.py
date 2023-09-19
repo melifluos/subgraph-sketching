@@ -3,10 +3,9 @@ import torch_geometric.transforms as T
 import torch
 import pandas as pd
 import os, sys 
-sys.path.insert(0, os.getcwd()+'/src')
 # param
-from configs.config_load import cfg_data as cfg
-from configs.config_load import update_cfg
+from src.configs.config_load import cfg_data as cfg
+from src.configs.config_load import update_cfg
 
 def get_raw_text_arxiv(cfg, use_text=False, seed=0):
     dataset = PygNodePropPredDataset(

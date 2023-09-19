@@ -20,11 +20,11 @@ from src.utils import ROOT_DIR, get_same_source_negs
 from src.lcc import get_largest_connected_component, remap_edges, get_node_mapper
 from src.datasets.seal import get_train_val_test_datasets
 from src.datasets.elph import get_hashed_train_val_test_datasets, make_train_eval_data
-import json
+import json, sys
 from pdb import set_trace as bp
 from yacs.config import CfgNode
-from configs.config_load import cfg_data as cfg
-from configs.config_load import update_cfg
+from src.configs.config_load import cfg_data as cfg
+from src.configs.config_load import update_cfg
 import os.path as osp
 from typing import Callable, List, Optional
 
@@ -276,26 +276,26 @@ def text_graph_loader(path: str,
     if not use_text:
         return Planetoid(path, dataset_name)
     else:
-        return Textgraph(path, dataset_name, use_text=True)
+        return Textgraph(cfg, dataset_name, use_text=True)
 
 def load_data(cfg, dataset, use_text=False, use_gpt=False, seed=0):
     if dataset == 'cora':
-        from  data_utils.load_cora import get_raw_text_cora as get_raw_text
+        from  src.data_utils.load_cora import get_raw_text_cora as get_raw_text
     elif dataset == 'pubmed':
-        from  data_utils.load_pubmed import get_raw_text_pubmed as get_raw_text
+        from  src.data_utils.load_pubmed import get_raw_text_pubmed as get_raw_text
     elif dataset == 'ogbn-arxiv':
-        from  data_utils.load_arxiv import get_raw_text_arxiv as get_raw_text
+        from  src.data_utils.load_arxiv import get_raw_text_arxiv as get_raw_text
     else:
         exit(f'Error: Dataset {dataset} not supported')
 
     # for training GNN
     if not use_text:
-        data, _ = get_raw_text(use_text=False, seed=seed)
+        data, _ = get_raw_text(cfg, use_text=False, seed=seed)
         return data
 
     # for finetuning LM
     if use_gpt:
-        data, text = get_raw_text(use_text=False, seed=seed)
+        data, text = get_raw_text(cfg, use_text=False, seed=seed)
         folder_path = 'gpt_responses/{}'.format(dataset)
         print(f"using gpt: {folder_path}")
         n = data.y.shape[0]
@@ -308,7 +308,7 @@ def load_data(cfg, dataset, use_text=False, use_gpt=False, seed=0):
                 content = json_data['choices'][0]['message']['content']
                 text.append(content)
     else:
-        data, text = get_raw_text(use_text=True, seed=seed)
+        data, text = get_raw_text(cfg, use_text=True, seed=seed)
 
     return data, text
 
@@ -384,7 +384,7 @@ class Textgraph(InMemoryDataset):
     url = ''
     geom_gcn_url = ('')
 
-    def __init__(self, cfg: CfgNode, root: str, name: str, use_text: bool = True, split: str = "public",
+    def __init__(self, cfg: CfgNode, name: str = 'cora', use_text: bool = True, split: str = "public",
                  num_train_per_class: int = 20, num_val: int = 500,
                  num_test: int = 1000, transform: Optional[Callable] = None,
                  pre_transform: Optional[Callable] = None):
@@ -396,10 +396,14 @@ class Textgraph(InMemoryDataset):
         self.root = cfg.dataset.cora.root
         self.lm_model_name = cfg.dataset.cora.lm_model_name
         self.seed = cfg.seed
+        self.device = cfg.device
         assert self.split in ['public', 'full', 'geom-gcn', 'random']
 
-        super().__init__(root, transform, pre_transform)
-        self.load(self.processed_paths[0])
+        for k, val in self.__dict__.items():
+            print(k, val)
+
+        super().__init__(self.root, transform, pre_transform)
+        self.load()
 
         if split == 'full':
             data = self.get(0)
@@ -425,6 +429,7 @@ class Textgraph(InMemoryDataset):
             data.test_mask[remaining[num_val:num_val + num_test]] = True
 
             self.data, self.slices = self.collate([data])
+
     @property
     def raw_file_names(self) -> List[str]:
         self.prt_lm = f"{self.root}/prt_lm/{self.dataset_name}/{self.lm_model_name}-seed{self.seed}.emb"
@@ -444,11 +449,14 @@ class Textgraph(InMemoryDataset):
     def num_nodes(self) -> int:
         return self.data.x.size(0)
 
-    def process(self):
+    def load(self):
         # read data from text files
         print("Loading pretrained LM features (title and abstract) ...")
-        data = load_data(self.cfg, self.dataset_name, use_text=False, seed=self.seed)
-        print(f"LM_emb_path: {self.prt_lmh}")
+        self.data = load_data(self.cfg, self.dataset_name, use_text=False, seed=self.seed)
+
+        # read from pretrained LM
+        print(f"LM_emb_path: {self.prt_lm}")
+        # /pfs/work7/workspace/scratch/cc7738-prefeature/TAPE/prt_lm/pubmed/deberta-base-seed1.emb
         features = torch.from_numpy(np.array(
             np.memmap(self.prt_lm, mode='r',
                       dtype=np.float16,
@@ -456,6 +464,9 @@ class Textgraph(InMemoryDataset):
         ).to(torch.float32)
         print(features.shape)
 
+        sys.exit(-1)
+        self.features = features.to(self.device)
+        self.data = data.to(self.device)
         # split masks for geom-gcn
         if self.split == 'geom-gcn':
             train_masks, val_masks, test_masks = [], [], []
@@ -477,4 +488,4 @@ class Textgraph(InMemoryDataset):
 
 
 if __name__ == "__main__":
-    Textgraph(cfg, 'dataset', 'cora', use_text=True)
+    Textgraph(cfg, 'cora', use_text=True)

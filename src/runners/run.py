@@ -16,7 +16,7 @@ import wandb
 from scipy.sparse import SparseEfficiencyWarning
 import sys, os
 sys.path.insert(0, '..')
-sys.path.insert(0, os.getcwd()+'/src')
+
 warnings.filterwarnings("ignore", category=SparseEfficiencyWarning)
 
 from src.data import get_data, get_loaders
@@ -145,8 +145,8 @@ if __name__ == '__main__':
     # Data settings
     parser = argparse.ArgumentParser(description='Efficient Link Prediction with Hashes (ELPH)')
     parser.add_argument('--dataset_name', type=str, default='Cora',
-                        choices=['cora', 'Citeseer', 'Pubmed', 'ogbl-ppa', 'ogbl-collab', 'ogbl-ddi',
-                                 'ogbl-citation2'])
+                        choices=['cora', 'Citeseer', 'pubmed', 'ogbl-ppa', 'ogbl-collab', 'ogbl-ddi',
+                                 'ogbl-citation2', 'ogbn-arxiv'])
     parser.add_argument('--use_text', type=bool, default=False,
                         help='whether to use text features')
     

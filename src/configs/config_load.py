@@ -11,7 +11,7 @@ def set_data_cfg(cfg):
 	# Cuda device number, used for machine with multiple gpus
 	cfg.device = 0
 	# Whether fix the running seed to remove randomness
-	cfg.seed = 0
+	cfg.seed = 1
 
 	cfg.dataset = CN()
 	cfg.dataset.name = 'cora'	
@@ -22,7 +22,7 @@ def set_data_cfg(cfg):
 	cfg.dataset.cora.original = cfg.dataset.cora.root + '/dataset/cora_orig/cora'
 	cfg.dataset.cora.papers =  cfg.dataset.cora.root + '/dataset/cora_orig/mccallum/cora/papers'
 	cfg.dataset.cora.extractions =  cfg.dataset.cora.root + '/dataset/cora_andrew_mccallum/extractions/'
-	cfg.dataset.cora.lm_model_name = 'base'
+	cfg.dataset.cora.lm_model_name = 'microsoft/deberta-base'
 	# ------------------------------------------------------------------------ #
 	cfg.dataset.pubmed = CN()
 	cfg.dataset.pubmed.root = '/pfs/work7/workspace/scratch/cc7738-prefeature/TAPE' 
