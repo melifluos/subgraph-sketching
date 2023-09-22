@@ -13,6 +13,7 @@ from torch_geometric.datasets import Planetoid
 from torch_geometric.transforms import RandomLinkSplit
 from torch_geometric.utils import (add_self_loops, negative_sampling,
                                    to_undirected)
+
 from torch_geometric.loader import DataLoader as pygDataLoader
 import wandb
 
@@ -26,12 +27,12 @@ from yacs.config import CfgNode
 from src.configs.config_load import cfg_data as cfg
 from src.configs.config_load import update_cfg
 import os.path as osp
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional
 
 import numpy as np
 import torch
 
-from torch_geometric.data import InMemoryDataset, download_url
+from torch_geometric.data import InMemoryDataset, download_url, Dataset
 from torch_geometric.io import read_planetoid_data
 
 def get_loaders(args, dataset, splits, directed):
@@ -91,18 +92,24 @@ def get_data(args):
     use_lcc_flag = True
     directed = False
     eval_metric = 'hits'
-    path = os.path.join(ROOT_DIR, 'dataset', dataset_name)
-    print(f'reading data from: {path}')
+    splits = None
 
-    if dataset_name.startswith('ogbl'):
-        use_lcc_flag = False
-        dataset = PygLinkPropPredDataset(name=dataset_name, root=path)
-        if dataset_name == 'ogbl-ddi':
-            dataset.data.x = torch.ones((dataset.data.num_nodes, 1))
-            dataset.data.edge_weight = torch.ones(dataset.data.edge_index.size(1), dtype=int)
+    if use_text and dataset_name in {'cora', 'pubmed', 'ogbn-arxiv'}:
+        dataset = Textgraph(cfg, dataset_name, use_text)
+        directed = False 
+        splits = dataset.splits
     else:
-        # cora, pubmed, arxiv all use this
-        dataset = text_graph_loader(path, dataset_name, use_text)
+        # https://github.com/melifluos/subgraph-sketching/blob/main/src/data.py#L82
+        path = os.path.join(ROOT_DIR, 'dataset', dataset_name)
+        print(f'reading data from: {path}')
+        if dataset_name.startswith('ogbl'):
+            use_lcc_flag = False
+            dataset = PygLinkPropPredDataset(name=dataset_name, root=path)
+            if dataset_name == 'ogbl-ddi':
+                dataset.data.x = torch.ones((dataset.data.num_nodes, 1))
+                dataset.data.edge_weight = torch.ones(dataset.data.edge_index.size(1), dtype=int)
+        else:
+            dataset = Planetoid(path, dataset_name)
 
     # set the metric
     if dataset_name.startswith('ogbl-citation'):
@@ -120,12 +127,14 @@ def get_data(args):
         if dataset_name == 'ogbl-collab' and args.year > 0:  # filter out training edges before args.year
             data, split_edge = filter_by_year(data, split_edge, args.year)
         splits = get_ogb_data(data, split_edge, dataset_name, args.num_negs)
-    else:  # make random splits
+    else:  # use the random splits
         transform = RandomLinkSplit(is_undirected=undirected, num_val=val_pct, num_test=test_pct,
                                     add_negative_train_samples=include_negatives)
+        print(type(dataset.data.edge_index))
         train_data, val_data, test_data = transform(dataset.data)
         splits = {'train': train_data, 'valid': val_data, 'test': test_data}
-
+        for v in splits.values():
+            print(np.sum(np.array(v.train_mask)))
     return dataset, splits, directed, eval_metric
 
 
@@ -266,17 +275,11 @@ def use_lcc(dataset):
         test_mask=torch.zeros(y_new.size()[0], dtype=torch.bool),
         val_mask=torch.zeros(y_new.size()[0], dtype=torch.bool)
     )
-    dataset.data = data
+    # original dataset._data = data
+    dataset._data = data
     return dataset
 
 
-def text_graph_loader(path: str,
-                      dataset_name :str,
-                      use_text: bool):
-    if not use_text:
-        return Planetoid(path, dataset_name)
-    else:
-        return Textgraph(cfg, dataset_name, use_text=True)
 
 def load_data(cfg, dataset, use_text=False, use_gpt=False, seed=0):
     if dataset == 'cora':
@@ -309,7 +312,7 @@ def load_data(cfg, dataset, use_text=False, use_gpt=False, seed=0):
                 text.append(content)
     else:
         data, text = get_raw_text(cfg, use_text=True, seed=seed)
-
+    print(data)
     return data, text
 
 
@@ -383,35 +386,163 @@ class Textgraph(InMemoryDataset):
     """
     url = ''
     geom_gcn_url = ('')
-
-    def __init__(self, cfg: CfgNode, name: str = 'cora', use_text: bool = True, split: str = "public",
+    
+    def __init__(self, cfg: CfgNode, name: str = 'cora', use_text: bool = False, split: str = "public",
                  num_train_per_class: int = 20, num_val: int = 500,
                  num_test: int = 1000, transform: Optional[Callable] = None,
                  pre_transform: Optional[Callable] = None):
+        # data 
         self.name = name+'-text'
         self.cfg = cfg
         self.use_text = use_text
-        self.split = split.lower()
+        self.split = split
         self.dataset_name = name
         self.root = cfg.dataset.cora.root
         self.lm_model_name = cfg.dataset.cora.lm_model_name
         self.seed = cfg.seed
         self.device = cfg.device
+        self.feature_type = cfg.dataset.feature_type # ogb, TA, E, P
+        self.transform = transform
+        self.pre_transform = pre_transform
+        # split 
         assert self.split in ['public', 'full', 'geom-gcn', 'random']
+        self.split = split
+        self.process()
 
+        if self.pre_transform is not None:
+            self._data = self.pre_transform(self._data)
+        torch.save(self.collate([self._data]), self.processed_paths[0])
+        # self.data = torch.load(self.processed_paths[0])
+        
+
+    @property
+    def raw_file_names(self) -> List[str]:
+        self.prt_lm = f"{self.root}/prt_lm/{self.dataset_name}/{self.lm_model_name}-seed{self.seed}.emb"
+        return [self.cfg.dataset.cora.original,
+        self.cfg.dataset.cora.papers,
+        self.cfg.dataset.cora.extractions,
+        self.prt_lm]
+
+    @property 
+    def processed_dir(self) -> str:
+        return osp.join(self.root, f'{self.dataset_name}/processed_text') if self.use_text else osp.join(self.root, f'{self.dataset_name}/processed')
+
+    @property
+    def processed_file_names(self) -> str:
+        return 'data.pt'
+
+
+    def download(self):
+        pass
+
+
+    @property
+    def num_nodes(self) -> int:
+        return self._data.x.size(0)
+    
+
+    @property
+    def num_node_features(self) -> int:
+        return self._data.x.size(1) 
+    
+
+    @property 
+    def num_edge_features(self) -> int:
+        raise NotImplementedError
+    
+    @property
+    def data(self) -> Any:
+        return self._data
+
+    @property
+    def splits(self) -> dict:
+        splits = {}
+        for masks in ['train_mask', 'val_mask', 'test_mask']:
+            if hasattr(self._data, masks):
+                if np.sum(np.array(getattr(self._data, masks))) == 0:
+                    return None
+                else:
+                    splits[masks] = getattr(self._data, masks)
+        return splits
+
+    def load_features(self) -> torch.Tensor:
+        """generate node features
+
+        Returns:
+            torch.tensor: _description_
+        """
+        if self.feature_type == 'ogb':
+            print("Loading OGB features...")
+            self.node_feat = self._data.x
+
+        elif self.feature_type == 'TA':
+            print("Loading pretrained LM features (title and abstract) ...")
+            LM_emb_path = f"{self.root}/prt_lm/{self.dataset_name}/{self.lm_model_name}-seed{self.seed}.emb"
+            print(f"LM_emb_path: {LM_emb_path}")
+            features = torch.from_numpy(np.array(
+                np.memmap(LM_emb_path, mode='r',
+                            dtype=np.float16,
+                            shape=(self.num_nodes, 768)))
+            ).to(torch.float32)
+            self.node_feat = features
+
+        elif self.feature_type == 'E':
+            print("Loading pretrained LM features (explanations) ...")
+            LM_emb_path = f"{self.root}/prt_lm/{self.dataset_name}2/{self.lm_model_name}-seed{self.seed}.emb"
+            print(f"LM_emb_path: {LM_emb_path}")
+            features = torch.from_numpy(np.array(
+                np.memmap(LM_emb_path, mode='r',
+                            dtype=np.float16,
+                            shape=(self.num_nodes, 768)))
+            ).to(torch.float32)
+            self.node_feat = features
+        else:
+            print(
+                f'Feature type {self.feature_type} not supported. Loading OGB features...')
+            self.feature_type = 'ogb'
+            self.node_feat = self._data.x
+    
+        return self.node_feat
+
+    def process(self):
+        # read data from text files
+
+        self._data = load_data(self.cfg, self.dataset_name, use_text=False, seed=self.seed)
+        # read from pretrained LM
+        self.node_feat = self.load_features()
+        # replace node features
+        self._data.x = self.node_feat
+        # masks 
+        self.get_split_mask_generator()
+        # save 
+        os.makedirs(self.processed_dir, exist_ok=True)
+        path = osp.join(self.processed_dir, 'data.pt')
+        torch.save(self._data, path)
+
+
+    def print_parameters(self):
         for k, val in self.__dict__.items():
             print(k, val)
 
-        super().__init__(self.root, transform, pre_transform)
-        self.load()
+    def __repr__(self) -> str:
+        return f'{self.name}()'
 
-        if split == 'full':
+
+    def get_split_mask_generator(self):
+        # availability test 
+        for masks in ['train_mask', 'val_mask', 'test_mask']:
+            if hasattr(self._data, masks):
+                return
+
+        if self.split == 'full':
+            raise NotImplementedError
             data = self.get(0)
             data.train_mask.fill_(True)
             data.train_mask[data.val_mask | data.test_mask] = False
             self.data, self.slices = self.collate([data])
 
-        elif split == 'random':
+        elif self.split == 'random':
+            raise NotImplementedError
             data = self.get(0)
             data.train_mask.fill_(False)
             for c in range(self.num_classes):
@@ -428,64 +559,5 @@ class Textgraph(InMemoryDataset):
             data.test_mask.fill_(False)
             data.test_mask[remaining[num_val:num_val + num_test]] = True
 
-            self.data, self.slices = self.collate([data])
-
-    @property
-    def raw_file_names(self) -> List[str]:
-        self.prt_lm = f"{self.root}/prt_lm/{self.dataset_name}/{self.lm_model_name}-seed{self.seed}.emb"
-        return [self.cfg.dataset.cora.original,
-        self.cfg.dataset.cora.papers,
-        self.cfg.dataset.cora.extractions,
-        self.prt_lm]
-
-    @property
-    def processed_file_names(self) -> str:
-        return 'data.pt'
-
-    def download(self):
-        pass
-
-    @property
-    def num_nodes(self) -> int:
-        return self.data.x.size(0)
-
-    def load(self):
-        # read data from text files
-        print("Loading pretrained LM features (title and abstract) ...")
-        self.data = load_data(self.cfg, self.dataset_name, use_text=False, seed=self.seed)
-
-        # read from pretrained LM
-        print(f"LM_emb_path: {self.prt_lm}")
-        # /pfs/work7/workspace/scratch/cc7738-prefeature/TAPE/prt_lm/pubmed/deberta-base-seed1.emb
-        features = torch.from_numpy(np.array(
-            np.memmap(self.prt_lm, mode='r',
-                      dtype=np.float16,
-                      shape=(self.num_nodes, 768)))
-        ).to(torch.float32)
-        print(features.shape)
-
-        sys.exit(-1)
-        self.features = features.to(self.device)
-        self.data = data.to(self.device)
-        # split masks for geom-gcn
-        if self.split == 'geom-gcn':
-            train_masks, val_masks, test_masks = [], [], []
-            for i in range(10):
-                name = None
-                splits = None
-                train_masks = None
-                val_masks = None
-                test_masks = None
-            data.train_mask = torch.stack(train_masks, dim=1)
-            data.val_mask = torch.stack(val_masks, dim=1)
-            data.test_mask = torch.stack(test_masks, dim=1)
-
-        data = data if self.pre_transform is None else self.pre_transform(data)
-        self.save([data], self.processed_paths[0])
-
-    def __repr__(self) -> str:
-        return f'{self.name}()'
-
-
-if __name__ == "__main__":
-    Textgraph(cfg, 'cora', use_text=True)
+# if __name__ == "__main__":
+#     Textgraph(cfg, 'cora', use_text=False)

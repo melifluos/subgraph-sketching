@@ -16,7 +16,6 @@ import wandb
 from scipy.sparse import SparseEfficiencyWarning
 import sys, os
 sys.path.insert(0, '..')
-
 warnings.filterwarnings("ignore", category=SparseEfficiencyWarning)
 
 from src.data import get_data, get_loaders
@@ -61,6 +60,7 @@ def run(args):
         
         emb = select_embedding(args, dataset.data.num_nodes, device)
         model, optimizer = select_model(args, dataset, emb, device)
+
         val_res = test_res = best_epoch = 0
         print(f'running repetition {rep}')
         if rep == 0:
@@ -106,9 +106,12 @@ def run(args):
     if args.save_model:
         path = f'{ROOT_DIR}/saved_models/{args.dataset_name}'
         torch.save(model.state_dict(), path)
-
+    if args.save_result:
+        path = f'{ROOT_DIR}/saved_results/{args.dataset_name}'
+        torch.save(model.state_dict(), path)
 
 def select_model(args, dataset, emb, device):
+    
     if args.model == 'SEALDGCNN':
         model = SEALDGCNN(args.hidden_channels, args.num_seal_layers, args.max_z, args.sortpool_k,
                           dataset, args.dynamic_train, use_feature=args.use_feature,
@@ -144,10 +147,10 @@ def select_model(args, dataset, emb, device):
 if __name__ == '__main__':
     # Data settings
     parser = argparse.ArgumentParser(description='Efficient Link Prediction with Hashes (ELPH)')
-    parser.add_argument('--dataset_name', type=str, default='Cora',
+    parser.add_argument('--dataset_name', type=str, required=True,
                         choices=['cora', 'Citeseer', 'pubmed', 'ogbl-ppa', 'ogbl-collab', 'ogbl-ddi',
                                  'ogbl-citation2', 'ogbn-arxiv'])
-    parser.add_argument('--use_text', type=bool, default=False,
+    parser.add_argument('--use_text', type=str2bool, required=True,
                         help='whether to use text features')
     
     parser.add_argument('--val_pct', type=float, default=0.1,
@@ -249,7 +252,7 @@ if __name__ == '__main__':
     parser.add_argument('--wandb_watch_grad', action='store_true', help='allows gradient tracking in train function')
     parser.add_argument('--wandb_track_grad_flow', action='store_true')
 
-    parser.add_argument('--wandb_entity', default="link-prediction", type=str)
+    parser.add_argument('--wandb_entity', default="graph-diffusion-model-link-prediction", type=str)
     parser.add_argument('--wandb_project', default="link-prediction", type=str)
     parser.add_argument('--wandb_group', default="testing", type=str, help="testing,tuning,eval")
     parser.add_argument('--wandb_run_name', default=None, type=str)
@@ -258,6 +261,8 @@ if __name__ == '__main__':
     parser.add_argument('--wandb_log_freq', type=int, default=1, help='Frequency to log metrics.')
     parser.add_argument('--wandb_epoch_list', nargs='+', default=[0, 1, 2, 4, 8, 16],
                         help='list of epochs to log gradient flow')
+    parser.add_argument('--wandb_notes', nargs='+', help='notes to add to wandb')
+    parser.add_argument('--wandb_tags', type=str, help='tags to add to wandb')
     parser.add_argument('--log_features', action='store_true', help="log feature importance")
     args = parser.parse_args()
     if (args.max_hash_hops == 1) and (not args.use_zero_one):
@@ -265,5 +270,5 @@ if __name__ == '__main__':
     if args.dataset_name == 'ogbl-ddi':
         args.use_feature = 0  # dataset has no features
         assert args.sign_k > 0, '--sign_k must be set to > 0 i.e. 1,2 or 3 for ogbl-ddi'
-    print(args)
+    print(args.use_text, args.dataset_name)
     run(args)

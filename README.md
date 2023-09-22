@@ -1,14 +1,3 @@
-# subgraph-sketching 
-
-Many Graph Neural Networks (GNNs) perform poorly compared to simple heuristics on Link Prediction (LP) tasks. This is due to limitations in expressive power such as the inability to count triangles (the backbone of most LP heuristics) and because they can not distinguish automorphic nodes (those having identical structural roles). Both expressiveness issues can be alleviated by learning link (rather than node) representations and incorporating structural features such as triangle counts. Since explicit link representations are often prohibitively expensive, recent
-works resorted to subgraph-based methods, which have achieved state-of-the-art performance for LP, but suffer from poor efficiency due to high levels of redundancy between subgraphs. We analyze the components of subgraph GNN (SGNN) methods for link prediction. Based on our analysis, we propose a novel full-graph GNN called ELPH (Efficient Link Prediction with Hashing) that passes subgraph
-sketches as messages to approximate the key components of SGNNs without explicit subgraph construction. ELPH is provably more expressive than Message Passing GNNs (MPNNs). It outperforms existing SGNN models on many standard LP benchmarks while being orders of magnitude faster. However, it shares the common GNN limitation that it is only efficient when the dataset fits in GPU memory. Accordingly, we develop a highly scalable model, called BUDDY, which uses feature precomputation to circumvent this limitation without sacrificing predictive performance. Our experiments show that BUDDY also outperforms SGNNs on standard LP benchmarks while being highly scalable and faster than ELPH.
-
-## Introduction
-
-This is a reimplementation of the code used for "Graph Neural Networks for Link Prediction with Subgraph Sketching" https://openreview.net/pdf?id=m1oqEOAozQU which was accepted for oral presentation (top 5% of accepted papers) at ICLR 2023.
-
-The high level structure of the code will not change, but some details such as default parameter settings remain work in progress.
 
 ## Dataset and Preprocessing
 
@@ -118,3 +107,26 @@ If you found this work useful, please cite our paper
   year={2023}
 }
 ```
+# Experiment 1
+# head 1 
+python runners/run.py --dataset_name pubmed --model ELPH --use_text False --wandb_run_name pubmed_elph
+python runners/run.py --dataset_name cora --model ELPH --use_text False --wandb_run_name cora_elph
+## not work 
+python runners/run.py --dataset_name ogbn-arxiv --model ELPH --use_text False --wandb_run_name ogbn-arxiv_elph
+python runners/run.py --dataset_name pubmed --model BUDDY --use_text False --wandb_run_name pubmed_elph
+python runners/run.py --dataset_name cora --model BUDDY --use_text False --wandb_run_name cora_elph
+## not work 
+python runners/run.py --dataset_name ogbn-arxiv --model BUDDY --use_text False --wandb_run_name ogbn-arxiv_elph
+
+# head 2 
+python runners/run.py --dataset_name pubmed --model ELPH --use_text True --wandb_run_name pubmed_elph_text
+python runners/run.py --dataset_name cora --model ELPH --use_text True  --wandb_run_name cora_elph_text
+## not work 
+python runners/run.py --dataset_name ogbn-arxiv --model ELPH --use_text True  --wandb_run_name ogbn-arxiv_elph_text
+python runners/run.py --dataset_name pubmed --model BUDDY --use_text True --wandb_run_name pubmed_elph_text
+python runners/run.py --dataset_name cora --model BUDDY --use_text True  --wandb_run_name cora_elph_text
+## not work 
+python runners/run.py --dataset_name ogbn-arxiv --model BUDDY --use_text True  --wandb_run_name ogbn-arxiv_elph_text
+
+
+'SEALDGCNN', 'SEALSAGE','SEALGCN','SEALGIN'

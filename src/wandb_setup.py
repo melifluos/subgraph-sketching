@@ -17,11 +17,11 @@ def initialise_wandb(args, config=None):
         else:
             os.environ["WANDB_MODE"] = "run"
         if 'wandb_run_name' in opt.keys():
-            wandb.init(entity=opt['wandb_entity'], project=opt['wandb_project'], group=opt['wandb_group'],
-                       name=opt['wandb_run_name'], reinit=True, config=opt)
+            wandb.init(project=opt['wandb_project'], config=opt) #, group=opt['wandb_group'],
+                    #   name=opt['wandb_run_name'], reinit=True, config=opt
         else:
-            wandb.init(entity=opt['wandb_entity'], project=opt['wandb_project'], group=opt['wandb_group'],
-                       reinit=True, config=opt)
+            wandb.init(entity=opt['wandb_entity'], project=opt['wandb_project'], config=opt) # , group=opt['wandb_group'],
+                    #   reinit=True, 
 
         wandb.define_metric("epoch_step")  # Customize axes - https://docs.wandb.ai/guides/track/log
         if opt['wandb_track_grad_flow']:

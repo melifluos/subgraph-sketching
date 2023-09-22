@@ -6,3 +6,5 @@ __pycache__/
 .idea/
 
 src/dataset/
+src/src/runners/__pycache_/
+src/wandb

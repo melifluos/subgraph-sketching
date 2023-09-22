@@ -55,12 +55,12 @@ def test(model, evaluator, train_loader, val_loader, test_loader, args, device, 
 def get_preds(model, loader, device, args, emb=None, split=None):
     n_samples = get_split_samples(split, args, len(loader.dataset))
     y_pred, y_true = [], []
-    pbar = tqdm(loader, ncols=70)
+    
     if args.wandb:
         wandb.log({f"inference_{split}_total_batches": len(loader)})
     batch_processing_times = []
     t0 = time.time()
-    for batch_count, data in enumerate(pbar):
+    for batch_count, data in enumerate(loader):
         start_time = time.time()
         # todo this should not get hit, refactor out the if statement
         if args.model == 'BUDDY':
@@ -113,7 +113,7 @@ def get_buddy_preds(model, loader, device, args, split=None):
             emb = model.node_embedding.weight
     else:
         emb = None
-    for batch_count, indices in enumerate(tqdm(loader)):
+    for batch_count, indices in enumerate(loader):
         curr_links = links[indices]
         batch_emb = None if emb is None else emb[curr_links].to(device)
         if args.use_struct_feature:
@@ -183,7 +183,7 @@ def get_elph_preds(model, loader, device, args, split=None):
     else:
         emb = None
     node_features, hashes, cards = model(data.x.to(device), data.edge_index.to(device))
-    for batch_count, indices in enumerate(tqdm(loader)):
+    for batch_count, indices in enumerate(loader):
         curr_links = links[indices].to(device)
         batch_emb = None if emb is None else emb[curr_links].to(device)
         if args.use_struct_feature:

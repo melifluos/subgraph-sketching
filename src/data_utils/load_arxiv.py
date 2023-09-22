@@ -6,10 +6,13 @@ import os, sys
 # param
 from src.configs.config_load import cfg_data as cfg
 from src.configs.config_load import update_cfg
+from  pdb import set_trace as bp
 
 def get_raw_text_arxiv(cfg, use_text=False, seed=0):
+    # dataset = PygNodePropPredDataset(
+    #     name='ogbn-arxiv', transform=T.ToSparseTensor())
     dataset = PygNodePropPredDataset(
-        name='ogbn-arxiv', transform=T.ToSparseTensor())
+        name='ogbn-arxiv')
     data = dataset[0]
 
     idx_splits = dataset.get_idx_split()
@@ -23,7 +26,7 @@ def get_raw_text_arxiv(cfg, use_text=False, seed=0):
     data.val_mask = val_mask
     data.test_mask = test_mask
 
-    data.edge_index = data.adj_t.to_symmetric()
+    # data.edge_index = data.adj_t.to_symmetric()
     if not use_text:
         return data, None
 

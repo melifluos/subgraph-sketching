@@ -110,11 +110,10 @@ def train(model, optimizer, train_loader, args, device, emb=None):
     else:
         train_samples = inf
     total_loss = 0
-    pbar = tqdm(train_loader, ncols=70)
     if args.wandb:
         wandb.log({"train_total_batches": len(train_loader)})
     batch_processing_times = []
-    for batch_count, data in enumerate(pbar):
+    for batch_count, data in enumerate(train_loader):
         start_time = time.time()
         optimizer.zero_grad()
         # todo this loop should no longer be hit as this function isn't called for BUDDY
@@ -186,7 +185,7 @@ def train_elph(model, optimizer, train_loader, args, device):
         wandb.log({"train_total_batches": len(train_loader)})
     batch_processing_times = []
     loader = DataLoader(range(len(links)), args.batch_size, shuffle=True)
-    for batch_count, indices in enumerate(tqdm(loader)):
+    for batch_count, indices in enumerate(loader):
         # do node level things
         if model.node_embedding is not None:
             if args.propagate_embeddings:

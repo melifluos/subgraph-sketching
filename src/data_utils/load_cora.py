@@ -27,7 +27,7 @@ def get_cora_casestudy(SEED=0):
     dataset = Planetoid('dataset', data_name,
                         transform=T.NormalizeFeatures())
     data = dataset[0]
-
+    print(data)
     data.x = torch.tensor(data_X).float()
     data.edge_index = torch.tensor(data_edges).long()
     data.y = torch.tensor(data_Y).long()

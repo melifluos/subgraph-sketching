@@ -33,7 +33,7 @@ def set_data_cfg(cfg):
 	cfg.dataset.arxiv.root = '/pfs/work7/workspace/scratch/cc7738-prefeature/TAPE'
 	cfg.dataset.arxiv.abs_ti = cfg.dataset.arxiv.root + '/dataset/ogbn_arxiv_orig/titleabs.tsv'
 
-
+	cfg.dataset.feature_type = 'TA'
 	return cfg
 
 
