@@ -11,7 +11,7 @@
 			"request": "launch",
 			"program": "${file}",
 			"console": "integratedTerminal",
-			"justMyCode": true, 
+			"justMyCode": false, 
 			"cwd": "/pfs/work7/workspace/scratch/cc7738-prefeature/subgraph-sketching/src",
 			"args": [
 				"--dataset_name",
@@ -33,6 +33,9 @@
 // python src/data_utils/load_cora.py
 // python src/data_utils/load_pubmed.py
 
-// python runners/run.py --dataset_name cora --model ELPH --use_text True --wandb_group reconstruct --wandb --args.reps 3 
-// python runners/run.py --dataset_name ogbn-arxiv --model ELPH --use_text True --wandb_group arxiv_elph_text reconstruct --wandb --args.reps 3 
-// python runners/run.py --dataset_name pubmed --model ELPH --use_text False --wandb_group pubmed_elph_text reconstruct --wandb --args.reps 3 
+// python runners/run.py --dataset_name cora --model ELPH --use_text True --wandb_group reconstruct --wandb --reps 3 
+// python runners/run.py --dataset_name ogbn-arxiv --model ELPH --use_text True --wandb_group arxiv_elph_text reconstruct --wandb --reps 3 
+// python runners/run.py --dataset_name pubmed --model ELPH --use_text False --wandb_group pubmed_elph_text reconstruct --wandb --reps 3 
+
+// python runners/run.py --dataset_name cora --model ELPH --dataset_name pubmed --model ELPH --use_text True --wandb_group reconstruct 
+// --wandb_tags baseline --wandb --reps 3

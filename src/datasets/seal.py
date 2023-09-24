@@ -27,6 +27,7 @@ class SEALDataset(InMemoryDataset):
     def __init__(self, root, data, pos_edges, neg_edges, num_hops, percent=1., split='train',
                  use_coalesce=False, node_label='drnl', ratio_per_hop=1.0,
                  max_nodes_per_hop=None, max_dist=1000, directed=False, sign=False, k=None):
+        bp()
         self.data = data
         self.pos_edges = pos_edges
         self.neg_edges = neg_edges

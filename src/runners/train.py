@@ -10,7 +10,7 @@ from torch.nn import BCEWithLogitsLoss
 from tqdm import tqdm
 import wandb
 import numpy as np
-
+from pdb import set_trace as bp 
 from src.utils import get_num_samples
 
 
@@ -195,8 +195,8 @@ def train_elph(model, optimizer, train_loader, args, device):
         else:
             emb = None
         # get node features
-        # TODO replace x with word_embedding generated from LM
         node_features, hashes, cards = model(data.x.to(device), data.edge_index.to(device))
+        bp()
         curr_links = links[indices].to(device)
         batch_node_features = None if node_features is None else node_features[curr_links]
         batch_emb = None if emb is None else emb[curr_links].to(device)
@@ -207,7 +207,7 @@ def train_elph(model, optimizer, train_loader, args, device):
             subgraph_features = torch.zeros(data.subgraph_features[indices].shape).to(device)
         start_time = time.time()
         optimizer.zero_grad()
-        
+        bp()
         logits = model.predictor(subgraph_features, batch_node_features, batch_emb)
         loss = get_loss(args.loss)(logits, labels[indices].squeeze(0).to(device))
 

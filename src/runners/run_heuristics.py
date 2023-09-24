@@ -73,6 +73,7 @@ def run(args):
         train_res, val_res, test_res = mrr_results[key]
         res_dic = {f'rep{rep}_Train' + key: 100 * train_res, f'rep{rep}_Val' + key: 100 * val_res,
                    f'rep{rep}_Test' + key: 100 * test_res}
+        
         wandb.log(res_dic)
         results_list.append(mrr_results[key])
       else:
