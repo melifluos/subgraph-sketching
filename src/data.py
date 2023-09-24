@@ -559,5 +559,55 @@ class Textgraph(InMemoryDataset):
             data.test_mask.fill_(False)
             data.test_mask[remaining[num_val:num_val + num_test]] = True
 
-# if __name__ == "__main__":
-#     Textgraph(cfg, 'cora', use_text=False)
+            self.data, self.slices = self.collate([data])
+    @property
+    def raw_file_names(self) -> List[str]:
+        self.prt_lm = f"{self.root}/prt_lm/{self.dataset_name}/{self.lm_model_name}-seed{self.seed}.emb"
+        return [self.cfg.dataset.cora.original,
+        self.cfg.dataset.cora.papers,
+        self.cfg.dataset.cora.extractions,
+        self.prt_lm]
+
+    @property
+    def processed_file_names(self) -> str:
+        return 'data.pt'
+
+    def download(self):
+        pass
+
+    @property
+    def num_nodes(self) -> int:
+        return self.data.x.size(0)
+
+    def process(self):
+        # read data from text files
+        print("Loading pretrained LM features (title and abstract) ...")
+        data = load_data(self.cfg, self.dataset_name, use_text=False, seed=self.seed)
+        print(f"LM_emb_path: {self.prt_lmh}")
+        features = torch.from_numpy(np.array(
+            np.memmap(self.prt_lm, mode='r',
+                      dtype=np.float16,
+                      shape=(self.num_nodes, 768)))
+        ).to(torch.float32)
+        print(features.shape)
+
+        # split masks for geom-gcn
+        if self.split == 'geom-gcn':
+            train_masks, val_masks, test_masks = [], [], []
+            for i in range(10):
+                name = None
+                splits = None
+                train_masks = None
+                val_masks = None
+                test_masks = None
+            data.train_mask = torch.stack(train_masks, dim=1)
+            data.val_mask = torch.stack(val_masks, dim=1)
+            data.test_mask = torch.stack(test_masks, dim=1)
+
+        data = data if self.pre_transform is None else self.pre_transform(data)
+        self.save([data], self.processed_paths[0])
+
+    def __repr__(self) -> str:
+        return f'{self.name}()'
+
+>>>>>>> 2b9f398 (local update)
