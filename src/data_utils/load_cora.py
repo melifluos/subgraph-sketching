@@ -11,7 +11,6 @@ from src.configs.config_load import cfg_data as cfg
 from src.configs.config_load import update_cfg
 # return cora dataset as pytorch geometric Data object together with 60/20/20 split, and list of cora IDs
 
-
 def get_cora_casestudy(SEED=0):
     data_X, data_Y, data_citeid, data_edges = parse_cora(cfg)
     # data_X = sklearn.preprocessing.normalize(data_X, norm="l1")
