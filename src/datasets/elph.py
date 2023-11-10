@@ -208,7 +208,8 @@ class HashDataset(Dataset):
                     sketching = HyperSketching(
                         number_of_hops=2,
                         precision=10,
-                        bits=6
+                        bits=6,
+                        normalize_by_symmetric_laplacian=False,
                     )
                     n_nodes = max(self.edge_index[0].max(), self.edge_index[1].max()) + 1
                     node_df = pd.DataFrame({'name': np.arange(n_nodes)})
