@@ -2,11 +2,11 @@
 main module
 """
 import argparse
+import random
+import sys
 import time
 import warnings
 from math import inf
-import sys
-import random
 
 sys.path.insert(0, '..')
 
@@ -23,12 +23,13 @@ from scipy.sparse import SparseEfficiencyWarning
 warnings.filterwarnings("ignore", category=SparseEfficiencyWarning)
 
 from src.data import get_data, get_loaders
-from src.models.elph import ELPH, BUDDY
+from src.models.elph import BUDDY, ELPH
 from src.models.seal import SEALDGCNN, SEALGCN, SEALGIN, SEALSAGE
+from src.runners.inference import test
+from src.runners.train import get_train_func
 from src.utils import ROOT_DIR, print_model_params, select_embedding, str2bool
 from src.wandb_setup import initialise_wandb
-from src.runners.train import get_train_func
-from src.runners.inference import test
+
 
 def set_seed(seed):
     """
@@ -161,6 +162,7 @@ if __name__ == '__main__':
     parser.add_argument('--train_cache_size', type=int, default=inf, help='the number of training edges to cache')
     parser.add_argument('--year', type=int, default=0, help='filter training data from before this year')
     parser.add_argument('--use_grape', action='store_true', help='use node features')
+    parser.add_argument('--use_grape_exact', action='store_true', help='use node features')
     # GNN settings
     parser.add_argument('--model', type=str, default='BUDDY')
     parser.add_argument('--hidden_channels', type=int, default=1024)

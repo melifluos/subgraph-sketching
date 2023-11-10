@@ -17,6 +17,7 @@ from torch_geometric.data import Dataset
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
 from torch_geometric.utils import to_undirected
 from torch_sparse import coalesce
+from tqdm import tqdm
 
 from src.hashing import ElphHashes
 from src.heuristics import RA
@@ -38,6 +39,7 @@ class HashDataset(Dataset):
         self.split = split  # string: train, valid or test
         self.root = root
         self.use_grape = args.use_grape
+        self.use_grape_exact = args.use_grape_exact
         self.pos_edges = pos_edges
         self.neg_edges = neg_edges
         self.use_coalesce = use_coalesce
@@ -215,11 +217,29 @@ class HashDataset(Dataset):
                     graph = Graph.from_pd(edges_df=pd.DataFrame(
                         {'src': self.edge_index[0].cpu().numpy(), 'dst': self.edge_index[1].cpu().numpy()}),
                         edge_src_column='src', edge_dst_column='dst', directed=False, nodes_df=node_df)
-                    sketching.fit(graph)
-                    # edge_df is a dict with keys {"overlap": np.array,
-                    # "left_difference": np.array, "right_difference:" np.array}
-                    # double check cpu-> numpy offloading
-                    edge_df = sketching.get_edge_feature_from_edge_node_ids(graph, self.links[:, 0].cpu().numpy().astype(np.uint32), self.links[:, 1].cpu().numpy().astype(np.uint32))
+
+                    if not self.use_grape_exact:
+                        sketching.fit(graph)
+                        # edge_df is a dict with keys {"overlap": np.array,
+                        # "left_difference": np.array, "right_difference:" np.array}
+                        # double check cpu-> numpy offloading
+                        edge_df = sketching.get_edge_feature_from_edge_node_ids(graph, self.links[:, 0].cpu().numpy().astype(np.uint32),
+                                                                                self.links[:, 1].cpu().numpy().astype(np.uint32))
+                    else:
+                        overlaps, lefts, rights = [], [], []
+                        for (src, dst) in tqdm(self.links):
+                            overlap, left, right = graph.get_exact_edge_sketching_from_edge_node_ids(
+                                src=src,
+                                dst=dst,
+                                include_selfloops=True,
+                                number_of_hops=2,
+                            )
+                            overlaps.append(overlap)
+                            lefts.append(left)
+                            rights.append(right)
+                        edge_df = {"overlap": np.stack(overlaps).astype(np.float32),
+                                   "left_difference": np.vstack(lefts).astype(np.float32),
+                                   "right_difference": np.vstack(rights).astype(np.float32)}
                 else:
                     hashes, cards = self.elph_hashes.build_hash_tables(num_nodes, self.edge_index)
                 print("Preprocessed hashes in: {:.2f} seconds".format(time() - start_time))
