@@ -208,7 +208,7 @@ class HashDataset(Dataset):
                 start_time = time()
                 if self.use_grape:
                     sketching = HyperSketching(
-                        number_of_hops=2,
+                        number_of_hops=self.max_hash_hops,
                         precision=10,
                         bits=6,
                         normalize_by_symmetric_laplacian=False,
