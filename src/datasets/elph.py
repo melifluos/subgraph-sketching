@@ -273,6 +273,7 @@ class HashedTrainEvalDataset(Dataset):
 
     def __init__(
             self, links, labels, subgraph_features, RA, dataset):
+        super(HashedTrainEvalDataset, self).__init__()
         self.links = links
         self.labels = labels
         self.edge_index = dataset.edge_index
