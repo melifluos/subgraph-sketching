@@ -51,7 +51,8 @@ class ElphHashes(object):
     """
 
     def __init__(self, args):
-        assert args.max_hash_hops in {1, 2, 3}, f'hashing is not implemented for {args.max_hash_hops} hops'
+        if not args.use_grape:
+            assert args.max_hash_hops in {1, 2, 3}, f'hashing is not implemented for {args.max_hash_hops} hops'
         self.max_hops = args.max_hash_hops
         self.floor_sf = args.floor_sf  # if true set minimum sf to 0 (they're counts, so it should be)
         # minhash params
@@ -65,7 +66,7 @@ class ElphHashes(object):
         self.p = args.hll_p
         self.m = 1 << self.p  # the bitshift way of writing 2^p
         self.use_zero_one = args.use_zero_one
-        self.label_lookup = LABEL_LOOKUP[self.max_hops]
+        # self.label_lookup = LABEL_LOOKUP[self.max_hops]
         tmp = HyperLogLogPlusPlus(p=self.p)
         # store values that are shared and only depend on p
         self.hll_hashfunc = tmp.hashfunc

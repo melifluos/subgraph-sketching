@@ -135,7 +135,7 @@ class HashingTests(unittest.TestCase):
         self.assertTrue(torch.all(tmp_features >= 0))
         self.assertTrue(len(tmp_features) == max_hops * (max_hops + 2))
         # this is weird, but I changed features from dict -> tensor and this was the fastest way to change the tests
-        features = {eh.label_lookup[idx]: val for idx, val in enumerate(tmp_features)}
+        features = {LABEL_LOOKUP[idx]: val for idx, val in enumerate(tmp_features)}
         # test (1,1) features
         int11 = neighbors11.intersection(neighbors21)
         self.assertTrue(isclose(len(int11), features[(1, 1)], abs_tol=1))
@@ -412,7 +412,7 @@ class HashingTests(unittest.TestCase):
         neighbors13 = neighbors(neighbors12, self.A).union(neighbors12)
         neighbors23 = neighbors(neighbors22, self.A).union(neighbors22)
 
-        features = {eh.label_lookup[idx]: val for idx, val in enumerate(tmp_features.flatten())}
+        features = {LABEL_LOOKUP[idx]: val for idx, val in enumerate(tmp_features.flatten())}
         # test (1,1) features
         int11 = neighbors11.intersection(neighbors21)
         self.assertTrue(isclose(len(int11), features[(1, 1)], abs_tol=1))

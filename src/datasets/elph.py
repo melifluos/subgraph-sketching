@@ -213,7 +213,7 @@ class HashDataset(Dataset):
                         bits=6,
                         normalize_by_symmetric_laplacian=False,
                     )
-                    n_nodes = max(self.edge_index[0].max(), self.edge_index[1].max()) + 1
+                    n_nodes = self.A.shape[0]
                     node_df = pd.DataFrame({'name': np.arange(n_nodes)})
                     graph = Graph.from_pd(edges_df=pd.DataFrame(
                         {'src': self.edge_index[0].cpu().numpy(), 'dst': self.edge_index[1].cpu().numpy()}),
@@ -325,6 +325,7 @@ class HashedTrainEvalDataset(Dataset):
 
     def __init__(
             self, links, labels, subgraph_features, RA, dataset):
+        super(HashedTrainEvalDataset, self).__init__()
         self.links = links
         self.labels = labels
         self.edge_index = dataset.edge_index
