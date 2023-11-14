@@ -181,6 +181,38 @@ class HashDataset(Dataset):
             subgraph_cache_name = f'{self.root}{self.split}_negs{num_negs}{year_str}{end_str}'
         return subgraph_cache_name, year_str, hop_str
 
+    def _get_knock_out_cols(self):
+        """
+        get the columns that contain features that are only nonzero for negative edges (in expectation)
+        @return:
+        @rtype:
+        """
+        if self.use_grape:
+            # todo: extend this algorithmically to cover all possible hops
+            # currently only 2 hop
+            knock_out_cols = [4, 6]
+        else:  # the columns are hardcoded in hashing.py and this is where we put these features
+            # do (0,1) and (1,0)
+            if self.max_hash_hops > 1:
+                knock_out_cols = [4, 5]
+            if self.max_hash_hops == 3:
+                knock_out_cols.extend([11, 12])  # also need to get rid of (0, 2) and (2, 0)
+        return knock_out_cols
+
+    def _maybe_knock_out_features(self):
+        """
+        Some of the model features act as labels for negative edges. Take two nodes i,j. The (0,1) feature with max_hash_hops=2
+        counts the number of nodes that are 1 hop from j and can not be reached in 2 hops from i. If this feature is non-zero
+        then we know that i and j are not connected and so (i,j) is a negative edge. This is still an approximation, but
+        in practice the model overfits badly to these features and so we knock them out
+        @return:
+        @rtype:
+        """
+        if not self.use_zero_one and self.subgraph_features is not None:  # knock out the zero_one features (0,1) and (1,0)
+            knock_out_cols = self._get_knock_out_cols()
+            self.subgraph_features[:, knock_out_cols] = 0
+
+
     def _preprocess_subgraph_features(self, device, num_nodes, num_negs=1):
         """
         Handles caching of hashes and subgraph features where each edge is fully hydrated as a preprocessing step
@@ -213,8 +245,9 @@ class HashDataset(Dataset):
                         bits=6,
                         normalize_by_symmetric_laplacian=False,
                     )
-                    n_nodes = self.A.shape[0]
-                    node_df = pd.DataFrame({'name': np.arange(n_nodes)})
+                    # n_nodes = self.A.shape[0]
+                    # node_df = pd.DataFrame({'name': np.arange(n_nodes)})
+                    node_df = pd.DataFrame({'name': np.arange(num_nodes)})
                     graph = Graph.from_pd(edges_df=pd.DataFrame(
                         {'src': self.edge_index[0].cpu().numpy(), 'dst': self.edge_index[1].cpu().numpy()}),
                         edge_src_column='src', edge_dst_column='dst', directed=False, nodes_df=node_df)
@@ -267,11 +300,8 @@ class HashDataset(Dataset):
             self.subgraph_features[self.subgraph_features < 0] = 0
             print(
                 f'setting {torch.sum(self.subgraph_features[self.subgraph_features < 0]).item()} negative values to zero')
-        if not self.use_zero_one and self.subgraph_features is not None:  # knock out the zero_one features (0,1) and (1,0)
-            if self.max_hash_hops > 1:
-                self.subgraph_features[:, [4, 5]] = 0
-            if self.max_hash_hops == 3:
-                self.subgraph_features[:, [11, 12]] = 0  # also need to get rid of (0, 2) and (2, 0)
+        # zero out the features that cause overfitting for negative samples
+        self._maybe_knock_out_features()
 
     def len(self):
         return len(self.links)

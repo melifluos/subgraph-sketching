@@ -210,3 +210,6 @@ class ELPHTests(unittest.TestCase):
         self.args.epochs = 1
         self.args.dataset_name = 'Cora'
         run(self.args)
+
+    def test_maybe_knock_out_features(self):
+        pass
