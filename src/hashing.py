@@ -1,18 +1,18 @@
 """
 hashed based data sketching for graphs. Implemented in pytorch, but based on the datasketch library
 """
-from time import time
 import logging
+from time import time
 
-from tqdm import tqdm
-import torch
-from torch import float
 import numpy as np
-from pandas.util import hash_array
+import torch
 from datasketch import HyperLogLogPlusPlus, hyperloglog_const
+from pandas.util import hash_array
+from torch import float
+from torch_geometric.loader import DataLoader
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import add_self_loops
-from torch_geometric.loader import DataLoader
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -308,13 +308,16 @@ class ElphHashes(object):
                                                                                                         12]  # (3, 0)
             else:
                 raise NotImplementedError("Only 1, 2 and 3 hop hashes are implemented")
+            
+            # TODO: Check if we still need this bit of code because we already knocking features out in
+            # _maybe_knock_out_features.
             if not self.use_zero_one:
                 if self.max_hops == 2:  # for two hops any positive edge that's dist 1 from u must be dist 2 from v etc.
                     features[:, 4] = 0
                     features[:, 5] = 0
                 elif self.max_hops == 3:  # in addition for three hops 0,2 is impossible for positive edges
-                    features[:, 4] = 0
-                    features[:, 5] = 0
+                    features[:, 9] = 0
+                    features[:, 10] = 0
                     features[:, 11] = 0
                     features[:, 12] = 0
             if self.floor_sf:  # should be more accurate, but in practice makes no difference

@@ -187,16 +187,10 @@ class HashDataset(Dataset):
         @return:
         @rtype:
         """
-        if self.use_grape:
-            # todo: extend this algorithmically to cover all possible hops
-            # currently only 2 hop
-            knock_out_cols = [4, 6]
-        else:  # the columns are hardcoded in hashing.py and this is where we put these features
-            # do (0,1) and (1,0)
-            if self.max_hash_hops > 1:
-                knock_out_cols = [4, 5]
-            if self.max_hash_hops == 3:
-                knock_out_cols.extend([11, 12])  # also need to get rid of (0, 2) and (2, 0)
+        if self.max_hash_hops == 2:
+            knock_out_cols = [4, 5]
+        if self.max_hash_hops == 3:
+            knock_out_cols = [9, 10, 11, 12]  # also need to get rid of (0, 2) and (2, 0)
         return knock_out_cols
 
     def _maybe_knock_out_features(self):
@@ -208,7 +202,7 @@ class HashDataset(Dataset):
         @return:
         @rtype:
         """
-        if not self.use_zero_one and self.subgraph_features is not None:  # knock out the zero_one features (0,1) and (1,0)
+        if not self.use_zero_one and self.subgraph_features is not None and not self.use_grape:  # knock out the zero_one features (0,1) and (1,0)
             knock_out_cols = self._get_knock_out_cols()
             self.subgraph_features[:, knock_out_cols] = 0
 
@@ -244,6 +238,9 @@ class HashDataset(Dataset):
                         precision=10,
                         bits=6,
                         normalize_by_symmetric_laplacian=False,
+                        zero_out_differences_cardinalities = not self.use_zero_one,
+                        include_node_types = False,
+                        include_edge_types = False,
                     )
                     # n_nodes = self.A.shape[0]
                     # node_df = pd.DataFrame({'name': np.arange(n_nodes)})
