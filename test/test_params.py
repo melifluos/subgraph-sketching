@@ -21,7 +21,7 @@ OPT = {'sample_size': None, 'dataset_name': 'Cora', 'num_hops': 2, 'max_dist': 1
        'minhash_num_perm': 128, 'floor_sf': False, 'year': 0, 'feature_prop': 'gcn', 'train_node_embeddings': False,
        'train_samples': inf, 'val_samples': inf, 'test_samples': inf, 'reps': 1, 'train_node_embedding': False,
        'pretrained_node_embedding': False, 'max_z': 1000, 'eval_steps': 1, 'K': 100, 'save_model': False,
-       'subgraph_feature_batch_size': 1000000}
+       'subgraph_feature_batch_size': 1000000, 'use_grape': False}
 
 
 def setup_seed(seed):

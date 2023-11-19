@@ -175,36 +175,12 @@ class HashDataset(Dataset):
             year_str = f'year_{self.args.year}'
         else:
             year_str = ''
+        grape_str = '_grape_' if self.use_grape else ''
         if num_negs == 1 or self.split != 'train':
-            subgraph_cache_name = f'{self.root}{self.split}{year_str}{end_str}'
+            subgraph_cache_name = f'{self.root}{self.split}{grape_str}{year_str}{end_str}'
         else:
-            subgraph_cache_name = f'{self.root}{self.split}_negs{num_negs}{year_str}{end_str}'
+            subgraph_cache_name = f'{self.root}{self.split}{grape_str}_negs{num_negs}{year_str}{end_str}'
         return subgraph_cache_name, year_str, hop_str
-
-    def _get_knock_out_cols(self):
-        """
-        get the columns that contain features that are only nonzero for negative edges (in expectation)
-        @return:
-        @rtype:
-        """
-        if self.max_hash_hops == 2:
-            knock_out_cols = [4, 5]
-        if self.max_hash_hops == 3:
-            knock_out_cols = [9, 10, 11, 12]  # also need to get rid of (0, 2) and (2, 0)
-        return knock_out_cols
-
-    def _maybe_knock_out_features(self):
-        """
-        Some of the model features act as labels for negative edges. Take two nodes i,j. The (0,1) feature with max_hash_hops=2
-        counts the number of nodes that are 1 hop from j and can not be reached in 2 hops from i. If this feature is non-zero
-        then we know that i and j are not connected and so (i,j) is a negative edge. This is still an approximation, but
-        in practice the model overfits badly to these features and so we knock them out
-        @return:
-        @rtype:
-        """
-        if not self.use_zero_one and self.subgraph_features is not None and not self.use_grape:  # knock out the zero_one features (0,1) and (1,0)
-            knock_out_cols = self._get_knock_out_cols()
-            self.subgraph_features[:, knock_out_cols] = 0
 
 
     def _preprocess_subgraph_features(self, device, num_nodes, num_negs=1):
@@ -235,15 +211,13 @@ class HashDataset(Dataset):
                 if self.use_grape:
                     sketching = HyperSketching(
                         number_of_hops=self.max_hash_hops,
-                        precision=10,
+                        precision=self.args.hll_p,
                         bits=6,
                         normalize_by_symmetric_laplacian=False,
-                        zero_out_differences_cardinalities = not self.use_zero_one,
-                        include_node_types = False,
-                        include_edge_types = False,
+                        zero_out_differences_cardinalities=not self.use_zero_one,
+                        include_node_types=False,
+                        include_edge_types=False,
                     )
-                    # n_nodes = self.A.shape[0]
-                    # node_df = pd.DataFrame({'name': np.arange(n_nodes)})
                     node_df = pd.DataFrame({'name': np.arange(num_nodes)})
                     graph = Graph.from_pd(edges_df=pd.DataFrame(
                         {'src': self.edge_index[0].cpu().numpy(), 'dst': self.edge_index[1].cpu().numpy()}),
@@ -254,8 +228,11 @@ class HashDataset(Dataset):
                         # edge_df is a dict with keys {"overlap": np.array,
                         # "left_difference": np.array, "right_difference:" np.array}
                         # double check cpu-> numpy offloading
-                        edge_df = sketching.get_edge_feature_from_edge_node_ids(graph, self.links[:, 0].cpu().numpy().astype(np.uint32),
-                                                                                self.links[:, 1].cpu().numpy().astype(np.uint32))
+                        edge_df = sketching.get_edge_feature_from_edge_node_ids(graph,
+                                                                                self.links[:, 0].cpu().numpy().astype(
+                                                                                    np.uint32),
+                                                                                self.links[:, 1].cpu().numpy().astype(
+                                                                                    np.uint32))
                     else:
                         overlaps, lefts, rights = [], [], []
                         for (src, dst) in tqdm(self.links):
@@ -297,8 +274,6 @@ class HashDataset(Dataset):
             self.subgraph_features[self.subgraph_features < 0] = 0
             print(
                 f'setting {torch.sum(self.subgraph_features[self.subgraph_features < 0]).item()} negative values to zero')
-        # zero out the features that cause overfitting for negative samples
-        self._maybe_knock_out_features()
 
     def len(self):
         return len(self.links)

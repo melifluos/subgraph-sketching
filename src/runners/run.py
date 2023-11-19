@@ -229,7 +229,7 @@ if __name__ == '__main__':
                         help="whether to use the counts of (0,1) and (1,0) neighbors")
     parser.add_argument('--floor_sf', type=str2bool, default=0,
                         help='the subgraph features represent counts, so should not be negative. If --floor_sf the min is set to 0')
-    parser.add_argument('--hll_p', type=int, default=8, help='the hyperloglog p parameter')
+    parser.add_argument('--hll_p', type=int, default=8, help='the hyperloglog precision parameter')
     parser.add_argument('--minhash_num_perm', type=int, default=128, help='the number of minhash perms')
     parser.add_argument('--max_hash_hops', type=int, default=2, help='the maximum number of hops to hash')
     parser.add_argument('--subgraph_feature_batch_size', type=int, default=11000000,

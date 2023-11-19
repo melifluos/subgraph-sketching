@@ -256,6 +256,20 @@ class ElphHashes(object):
             raise ValueError('source and destination hash value shapes must be the same')
         return torch.count_nonzero(src == dst, dim=-1) / self.num_perm
 
+
+    def _get_knock_out_cols(self):
+        """
+        get the columns that contain features that are only nonzero for negative edges (in expectation)
+        @return:
+        @rtype:
+        """
+        knock_out_cols = []
+        if self.max_hops == 2:
+            knock_out_cols = [4, 5]  # remove (0,1) and (1,0)
+        if self.max_hops == 3:
+            knock_out_cols = [9, 10, 11, 12]  # also need to get rid of (0, 2) and (2, 0)
+        return knock_out_cols
+
     def get_subgraph_features(self, links, hash_table, cards, batch_size=11000000):
         """
         extracts the features that play a similar role to the labeling trick features. These can be thought of as approximations
@@ -308,19 +322,11 @@ class ElphHashes(object):
                                                                                                         12]  # (3, 0)
             else:
                 raise NotImplementedError("Only 1, 2 and 3 hop hashes are implemented")
-            
-            # TODO: Check if we still need this bit of code because we already knocking features out in
-            # _maybe_knock_out_features.
             if not self.use_zero_one:
-                if self.max_hops == 2:  # for two hops any positive edge that's dist 1 from u must be dist 2 from v etc.
-                    features[:, 4] = 0
-                    features[:, 5] = 0
-                elif self.max_hops == 3:  # in addition for three hops 0,2 is impossible for positive edges
-                    features[:, 9] = 0
-                    features[:, 10] = 0
-                    features[:, 11] = 0
-                    features[:, 12] = 0
+                features[:, self._get_knock_out_cols()] = 0
             if self.floor_sf:  # should be more accurate, but in practice makes no difference
+                print(
+                    f'setting {torch.sum(features[features < 0]).item()} negative values to zero')
                 features[features < 0] = 0
             all_features.append(features)
         features = torch.cat(all_features, dim=0)
