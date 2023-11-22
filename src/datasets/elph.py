@@ -384,7 +384,7 @@ def make_train_eval_data(args, train_dataset, num_nodes, n_pos_samples=5000, neg
         RA_links = None
     pos_sf = train_dataset.subgraph_features[:n_pos_samples]
     # try to read negative subgraph features from disk or generate them
-    subgraph_cache_name = f'{ROOT_DIR}/dataset/{dataset_name}/train_eval_negative_samples_{negs_per_pos}_subgraph_featurecache.pt'
+    subgraph_cache_name, _, _ = train_dataset._generate_file_names(negs_per_pos)
     print(f'looking for subgraph features at {subgraph_cache_name}')
     if os.path.exists(subgraph_cache_name):
         neg_sf = torch.load(subgraph_cache_name).to(pos_sf.device)
