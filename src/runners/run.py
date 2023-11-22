@@ -199,7 +199,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--weight_decay', type=float, default=0, help='Weight decay for optimization')
     parser.add_argument('--epochs', type=int, default=100)
-    parser.add_argument('--num_workers', type=int, default=4)
+    parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--num_negs', type=int, default=1, help='number of negatives for each positive')
     parser.add_argument('--train_node_embedding', action='store_true',
                         help="also train free-parameter node embeddings together with GNN")
@@ -234,7 +234,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_hash_hops', type=int, default=2, help='the maximum number of hops to hash')
     parser.add_argument('--subgraph_feature_batch_size', type=int, default=11000000,
                         help='the number of edges to use in each batch when calculating subgraph features. '
-                             'Reduce or this or increase system RAM if seeing killed messages for large graphs')
+                             'Reduce this or increase system RAM if seeing killed messages for large graphs')
     # wandb settings
     parser.add_argument('--wandb', action='store_true', help="flag if logging to wandb")
     parser.add_argument('--wandb_offline', dest='use_wandb_offline',

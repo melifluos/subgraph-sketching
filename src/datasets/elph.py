@@ -175,13 +175,17 @@ class HashDataset(Dataset):
             year_str = f'year_{self.args.year}'
         else:
             year_str = ''
-        grape_str = '_grape_' if self.use_grape else ''
+        grape_str = '_grape' if self.use_grape else ''
+        hll_str = f'_hllp{self.hll_p}'
         if num_negs == 1 or self.split != 'train':
-            subgraph_cache_name = f'{self.root}{self.split}{grape_str}{year_str}{end_str}'
+            subgraph_cache_name = f'{self.root}{self.split}{grape_str}{year_str}'
         else:
-            subgraph_cache_name = f'{self.root}{self.split}{grape_str}_negs{num_negs}{year_str}{end_str}'
+            subgraph_cache_name = f'{self.root}{self.split}{grape_str}_negs{num_negs}{year_str}'
+        if self.use_zero_one:
+            subgraph_cache_name += '_masked_features'
+        subgraph_cache_name += hll_str
+        subgraph_cache_name += end_str
         return subgraph_cache_name, year_str, hop_str
-
 
     def _preprocess_subgraph_features(self, device, num_nodes, num_negs=1):
         """
