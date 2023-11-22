@@ -13,7 +13,7 @@ import scipy.sparse as ssp
 
 from src.datasets.elph import HashDataset, make_train_eval_data
 from test_params import OPT
-from src.utils import ROOT_DIR
+from src.utils import ROOT_DIR, get_same_source_negs
 from src.hashing import ElphHashes
 
 
@@ -108,10 +108,12 @@ class ELPHDatasetTests(unittest.TestCase):
     def test_make_train_eval_dataset(self):
         self.args.max_hash_hops = 2
         torch.manual_seed(0)
-        pos_edges = torch.randint(self.n_nodes, (10, 2))
-        neg_edges = torch.randint(self.n_nodes, (10, 2))
         n_pos_samples = 8
         negs_per_pos = 10
+        n_pos_edges = 10
+        pos_edges = torch.randint(self.n_nodes, (n_pos_edges, 2))
+        neg_edges = get_same_source_negs(self.n_nodes, negs_per_pos, pos_edges.t()).t()
+        # neg_edges = torch.randint(self.n_nodes, (n_pos_edges * negs_per_pos, 2))
         split = 'train'
         ei = self.edge_index
         data = Data(self.x, ei)
@@ -144,3 +146,12 @@ class ELPHDatasetTests(unittest.TestCase):
         train_eval_dataset = make_train_eval_data(self.args, hdd, self.n_nodes, n_pos_samples=n_pos_samples,
                                                   negs_per_pos=negs_per_pos)
         self.assertTrue(len(train_eval_dataset.RA) == (negs_per_pos + 1) * n_pos_samples)
+        # citation eval is with mrr against same source negatives. The code checks if the name starts wiht 'ogbl-citation'
+        # and if so, generates the same source negatives
+        hdd = HashDataset(root, split, data, pos_edges, neg_edges, self.args, use_coalesce=False,
+                          directed=True)
+        train_eval_dataset = make_train_eval_data(self.args, hdd, self.n_nodes, n_pos_samples=n_pos_samples,
+                                                  negs_per_pos=negs_per_pos)
+        self.assertTrue(len(train_eval_dataset.links) == (negs_per_pos + 1) * n_pos_samples)
+        self.assertTrue(len(train_eval_dataset.labels) == (negs_per_pos + 1) * n_pos_samples)
+        self.assertTrue(len(train_eval_dataset.subgraph_features) == (negs_per_pos + 1) * n_pos_samples)

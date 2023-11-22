@@ -301,20 +301,10 @@ def make_train_eval_data(args, train_dataset, num_nodes, n_pos_samples=5000, neg
     # ideally the negatives and the subgraph features are cached and just read from disk
     # need to save train_eval_negs_5000 and train_eval_subgraph_features_5000 files
     # and ensure that the order is always the same just as with the other datasets
-    # todo: read the negatives and negative structure features straight from the dataset object instead of caching
     print('constructing dataset to evaluate training performance')
     dataset_name = args.dataset_name
     pos_sample = train_dataset.pos_edges[:n_pos_samples]  # [num_edges, 2]
-    negs_name = f'{ROOT_DIR}/dataset/{dataset_name}/train_eval_negative_samples_{negs_per_pos}.pt'
-    print(f'looking for negative edges at {negs_name}')
-    if os.path.exists(negs_name):
-        print('loading negatives from disk')
-        neg_sample = torch.load(negs_name)
-    else:
-        print('negatives not found on disk. Generating negatives')
-        neg_sample = get_same_source_negs(num_nodes, negs_per_pos, pos_sample.t()).t()  # [num_neg_edges, 2]
-        torch.save(neg_sample, negs_name)
-    # make sure these are the correct negative samples with source nodes corresponding to the positive samples
+    neg_sample = train_dataset.neg_edges[:n_pos_samples * negs_per_pos]  # [num_neg_edges, 2]
     assert torch.all(torch.eq(pos_sample[:, 0].repeat_interleave(negs_per_pos), neg_sample[:,
                                                                                 0])), 'negatives have different source nodes to positives. Delete train_eval_negative_samples_* and subgraph features and regenerate'
     links = torch.cat([pos_sample, neg_sample], 0)  # [n_edges, 2]
@@ -326,32 +316,10 @@ def make_train_eval_data(args, train_dataset, num_nodes, n_pos_samples=5000, neg
     else:
         RA_links = None
     pos_sf = train_dataset.subgraph_features[:n_pos_samples]
-    # try to read negative subgraph features from disk or generate them
-    subgraph_cache_name, _, _ = train_dataset._generate_file_names(negs_per_pos)
-    print(f'looking for subgraph features at {subgraph_cache_name}')
-    if os.path.exists(subgraph_cache_name):
-        neg_sf = torch.load(subgraph_cache_name).to(pos_sf.device)
-        print(f"cached subgraph features found at: {subgraph_cache_name}")
-        assert neg_sf.shape[0] == len(
-            neg_sample * negs_per_pos), 'subgraph features are a different shape link object. Delete subgraph features file and regenerate'
-    else:  # generate negative subgraph features
-        #  we're going to need the hashes
-        file_stub = dataset_name.replace('-', '_')  # pyg likes to add -
-        if args.max_hash_hops == 3:
-            hash_name = f'{ROOT_DIR}/dataset/{dataset_name}/{file_stub}_elph__train_3hop_hashcache.pt'
-        else:
-            hash_name = f'{ROOT_DIR}/dataset/{dataset_name}/{file_stub}_elph__train_hashcache.pt'
-        print(f'looking for hashes at {hash_name}')
-        eh = ElphHashes(args)
-        if os.path.exists(hash_name):
-            hashes = torch.load(hash_name)
-            print(f"cached hashes found at: {hash_name}")
-        else:  # need to generate the hashes, but this is a corner case as they should have been generated to make the training dataset
-            hashes, cards = eh.build_hash_tables(num_nodes, train_dataset.edge_index)
-            torch.save(hashes, hash_name)
-        print('caching subgraph features for negative samples to evaluate training performance')
-        neg_sf = eh.get_subgraph_features(neg_sample, hashes, cards)
-        torch.save(neg_sf, subgraph_cache_name)
+    n_pos_edges = len(train_dataset.pos_edges)
+    neg_sf = train_dataset.subgraph_features[n_pos_edges: n_pos_edges + len(neg_sample)]
+    # check these indices are all negative samples
+    assert sum(train_dataset.labels[n_pos_edges: n_pos_edges + len(neg_sample)]) == 0
     subgraph_features = torch.cat([pos_sf, neg_sf], dim=0)
     train_eval_dataset = HashedTrainEvalDataset(links, labels, subgraph_features, RA_links, train_dataset)
     return train_eval_dataset
