@@ -17,7 +17,7 @@ DEFAULT_DIC = {'sample_size': None, 'dataset_name': 'Cora', 'num_hops': 2, 'max_
                'dynamic_test': True, 'node_label': 'drnl', 'ratio_per_hop': 1, 'use_feature': True, 'dropout': 0,
                'label_dropout': 0, 'feature_dropout': 0,
                'add_normed_features': False, 'use_RA': False, 'hidden_channels': 32, 'load_features': True,
-               'load_hashes': True, 'use_zero_one': True, 'wandb': False, 'batch_size': 32, 'num_workers': 1,
+               'use_zero_one': True, 'wandb': False, 'batch_size': 32, 'num_workers': 1,
                'cache_subgraph_features': False, 'eval_batch_size': 1000, 'num_negs': 1}
 
 

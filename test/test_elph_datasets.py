@@ -118,14 +118,12 @@ class ELPHDatasetTests(unittest.TestCase):
         root = f'{ROOT_DIR}/test/dataset/test_HashedDynamicDataset'
         hdd = HashDataset(root, split, data, pos_edges, neg_edges, self.args, use_coalesce=False,
                           directed=False)
-        train_eval_dataset = make_train_eval_data(self.args, hdd, self.n_nodes, n_pos_samples=n_pos_samples,
-                                                  negs_per_pos=negs_per_pos)
+        train_eval_dataset = make_train_eval_data(hdd, self.n_nodes, n_pos_samples=n_pos_samples)
         self.assertTrue(len(train_eval_dataset.links) == (negs_per_pos + 1) * n_pos_samples)
         self.assertTrue(len(train_eval_dataset.labels) == (negs_per_pos + 1) * n_pos_samples)
         self.assertTrue(len(train_eval_dataset.subgraph_features) == (negs_per_pos + 1) * n_pos_samples)
         self.args.use_RA = True
         hdd = HashDataset(root, split, data, pos_edges, neg_edges, self.args, use_coalesce=False,
                           directed=False)
-        train_eval_dataset = make_train_eval_data(self.args, hdd, self.n_nodes, n_pos_samples=n_pos_samples,
-                                                  negs_per_pos=negs_per_pos)
+        train_eval_dataset = make_train_eval_data(hdd, n_pos_samples=n_pos_samples)
         self.assertTrue(len(train_eval_dataset.RA) == (negs_per_pos + 1) * n_pos_samples)

@@ -48,8 +48,7 @@ def get_loaders(args, dataset, splits, directed):
                      num_workers=args.num_workers)
     if (args.dataset_name == 'ogbl-citation2') and (args.model in {'ELPH', 'BUDDY'}):
         train_eval_loader = dl(
-            make_train_eval_data(args, train_dataset, train_data.num_nodes,
-                                  n_pos_samples=5000), batch_size=args.batch_size, shuffle=False,
+            make_train_eval_data(train_dataset, dataset.num_nodes, n_pos_samples=5000), batch_size=args.batch_size, shuffle=False,
             num_workers=args.num_workers)
     else:
         # todo change this so that eval doesn't have to use the full training set

@@ -142,7 +142,7 @@ class HashDataset(Dataset):
                 torch.save(x.cpu(), feature_name)
         return x
 
-    def _read_subgraph_features(self, name, device):
+    def _read_subgraph_features(self, name: str, device: torch.device) -> bool:
         """
         return True if the subgraph features can be read off disk, otherwise returns False
         @param name:
@@ -187,6 +187,63 @@ class HashDataset(Dataset):
         subgraph_cache_name += end_str
         return subgraph_cache_name, year_str, hop_str
 
+    def construct_grape_features(self, num_nodes: int, links: torch.Tensor):
+        """
+        Construct the edge_df using the grape hashing library instead of datasketch. This is much faster and only uses
+        a fraction of the memory of datasketch by not generating minhashes
+        @param num_nodes: number of nodes in the graph being sketched
+        @param links: Tensor [n_edges, 2] of edge indices. Passed even though it is a class attribute because we don't always
+        want to use all the edges
+        @return:
+        """
+        sketching = HyperSketching(
+            number_of_hops=self.max_hash_hops,
+            precision=self.args.hll_p,
+            bits=6,
+
+            normalize_by_symmetric_laplacian=False,
+            zero_out_differences_cardinalities=not self.use_zero_one,
+            include_node_types=False,
+            include_edge_types=False,
+        )
+        node_df = pd.DataFrame({'name': np.arange(num_nodes)})
+        graph = Graph.from_pd(edges_df=pd.DataFrame(
+            {'src': self.edge_index[0].cpu().numpy(), 'dst': self.edge_index[1].cpu().numpy()}),
+            edge_src_column='src', edge_dst_column='dst', directed=False, nodes_df=node_df)
+
+        if not self.use_grape_exact:
+            sketching.fit(graph)
+            # edge_df is a dict with keys {"overlap": np.array,
+            # "left_difference": np.array, "right_difference:" np.array}
+            # double check cpu-> numpy offloading
+            edge_df = sketching.get_edge_feature_from_edge_node_ids(graph,
+                                                                    links[:, 0].cpu().numpy().astype(
+                                                                        np.uint32),
+                                                                    links[:, 1].cpu().numpy().astype(
+                                                                        np.uint32))
+        else:
+            overlaps, lefts, rights = [], [], []
+            for (src, dst) in tqdm(links):
+                overlap, left, right = graph.get_exact_edge_sketching_from_edge_node_ids(
+                    src=src,
+                    dst=dst,
+                    include_selfloops=True,
+                    number_of_hops=2,
+                )
+                overlaps.append(overlap)
+                lefts.append(left)
+                rights.append(right)
+            edge_df = {"overlap": np.stack(overlaps).astype(np.float32),
+                       "left_difference": np.vstack(lefts).astype(np.float32),
+                       "right_difference": np.vstack(rights).astype(np.float32)}
+
+        overlap = torch.tensor(edge_df["overlap"].reshape(edge_df["overlap"].shape[0], -1))
+        left = torch.tensor(edge_df["left_difference"].reshape(edge_df["left_difference"].shape[0], -1))
+        right = torch.tensor(edge_df["right_difference"].reshape(edge_df["right_difference"].shape[0], -1))
+
+        return overlap, left, right
+
+
     def _preprocess_subgraph_features(self, device, num_nodes, num_negs=1):
         """
         Handles caching of hashes and subgraph features where each edge is fully hydrated as a preprocessing step
@@ -194,81 +251,22 @@ class HashDataset(Dataset):
         @return:
         """
         subgraph_cache_name, year_str, hop_str = self._generate_file_names(num_negs)
-        found_subgraph_features = self._read_subgraph_features(subgraph_cache_name, device)
+        # if the subgraph features are already on disk, read them into self.subgraph_features
+        found_subgraph_features: bool = self._read_subgraph_features(subgraph_cache_name, device)
         if not found_subgraph_features:
-            if self.cache_subgraph_features:
-                print(f'no subgraph features found at {subgraph_cache_name}')
-            print('generating subgraph features')
-            hash_name = f'{self.root}{self.split}{year_str}_{hop_str}hashcache.pt'
-            cards_name = f'{self.root}{self.split}{year_str}_{hop_str}cardcache.pt'
-            if self.load_hashes and os.path.exists(hash_name):
-                print('loading hashes from disk')
-                hashes = torch.load(hash_name)
-                if os.path.exists(cards_name):
-                    print('loading cards from disk')
-                    cards = torch.load(cards_name)
-                else:
-                    print(f'hashes found at {hash_name}, but cards not found. Delete hashes and run again')
-            else:
-                print('no hashes found on disk, constructing hashes...')
-                start_time = time()
-                if self.use_grape:
-                    sketching = HyperSketching(
-                        number_of_hops=self.max_hash_hops,
-                        precision=self.args.hll_p,
-                        bits=6,
-                        normalize_by_symmetric_laplacian=False,
-                        zero_out_differences_cardinalities=not self.use_zero_one,
-                        include_node_types=False,
-                        include_edge_types=False,
-                    )
-                    node_df = pd.DataFrame({'name': np.arange(num_nodes)})
-                    graph = Graph.from_pd(edges_df=pd.DataFrame(
-                        {'src': self.edge_index[0].cpu().numpy(), 'dst': self.edge_index[1].cpu().numpy()}),
-                        edge_src_column='src', edge_dst_column='dst', directed=False, nodes_df=node_df)
-
-                    if not self.use_grape_exact:
-                        sketching.fit(graph)
-                        # edge_df is a dict with keys {"overlap": np.array,
-                        # "left_difference": np.array, "right_difference:" np.array}
-                        # double check cpu-> numpy offloading
-                        edge_df = sketching.get_edge_feature_from_edge_node_ids(graph,
-                                                                                self.links[:, 0].cpu().numpy().astype(
-                                                                                    np.uint32),
-                                                                                self.links[:, 1].cpu().numpy().astype(
-                                                                                    np.uint32))
-                    else:
-                        overlaps, lefts, rights = [], [], []
-                        for (src, dst) in tqdm(self.links):
-                            overlap, left, right = graph.get_exact_edge_sketching_from_edge_node_ids(
-                                src=src,
-                                dst=dst,
-                                include_selfloops=True,
-                                number_of_hops=2,
-                            )
-                            overlaps.append(overlap)
-                            lefts.append(left)
-                            rights.append(right)
-                        edge_df = {"overlap": np.stack(overlaps).astype(np.float32),
-                                   "left_difference": np.vstack(lefts).astype(np.float32),
-                                   "right_difference": np.vstack(rights).astype(np.float32)}
-                else:
-                    hashes, cards = self.elph_hashes.build_hash_tables(num_nodes, self.edge_index)
-                print("Preprocessed hashes in: {:.2f} seconds".format(time() - start_time))
-                if self.load_hashes:
-                    torch.save(cards, cards_name)
-                    torch.save(hashes, hash_name)
-            print('constructing subgraph features')
+            print(f'no subgraph features found at {subgraph_cache_name}. Generating subgraph features')
             start_time = time()
             if self.use_grape:
                 # use grape Tensor[n_edges, max_hops(max_hops+2)]
-                overlap = torch.tensor(edge_df["overlap"].reshape(edge_df["overlap"].shape[0], -1))
-                left = torch.tensor(edge_df["left_difference"].reshape(edge_df["left_difference"].shape[0], -1))
-                right = torch.tensor(edge_df["right_difference"].reshape(edge_df["right_difference"].shape[0], -1))
+                overlap, left, right = self.construct_grape_features(num_nodes, self.links)
+                # use grape Tensor[n_edges, max_hops(max_hops+2)]
                 self.subgraph_features = torch.cat([overlap, left, right], dim=1)
             else:
+                hashes, cards = self.elph_hashes.build_hash_tables(num_nodes, self.edge_index)
+                print(f'Preprocessed hashes in: {time()-start_time:.2f} seconds. Constructing subgraph features')
                 self.subgraph_features = self.elph_hashes.get_subgraph_features(self.links, hashes, cards,
                                                                                 self.args.subgraph_feature_batch_size)
+
             print("Preprocessed subgraph features in: {:.2f} seconds".format(time() - start_time))
             assert self.subgraph_features.shape[0] == len(
                 self.links), 'subgraph features are a different shape link object. Delete subgraph features file and regenerate'
@@ -347,7 +345,7 @@ class HashedTrainEvalDataset(Dataset):
         return self.links[idx]
 
 
-def make_train_eval_data(args, train_dataset, num_nodes, n_pos_samples=5000, negs_per_pos=1000):
+def make_train_eval_data(train_dataset, num_nodes, n_pos_samples=5000, n_negs_per_pos=None):
     """
     A much smaller subset of the training data to get a comparable (with test and val) measure of training performance
     to diagnose overfitting
@@ -360,18 +358,17 @@ def make_train_eval_data(args, train_dataset, num_nodes, n_pos_samples=5000, neg
     # need to save train_eval_negs_5000 and train_eval_subgraph_features_5000 files
     # and ensure that the order is always the same just as with the other datasets
     print('constructing dataset to evaluate training performance')
-    dataset_name = args.dataset_name
-    pos_sample = train_dataset.pos_edges[:n_pos_samples]  # [num_edges, 2]
-    negs_name = f'{ROOT_DIR}/dataset/{dataset_name}/train_eval_negative_samples_{negs_per_pos}.pt'
-    print(f'looking for negative edges at {negs_name}')
-    if os.path.exists(negs_name):
-        print('loading negatives from disk')
-        neg_sample = torch.load(negs_name)
+    n_pos_edges = len(train_dataset.pos_edges)
+    n_neg_edges = len(train_dataset.neg_edges)
+    negs_per_pos = int(n_neg_edges / n_pos_edges)
+    if n_negs_per_pos is not None and n_negs_per_pos > negs_per_pos:
+        # we don't have enough negatives in the training set already, so need to generate them.
+        neg_sample = get_same_source_negs(num_nodes, train_dataset.pos_edges, n_negs_per_pos)
     else:
-        print('negatives not found on disk. Generating negatives')
-        neg_sample = get_same_source_negs(num_nodes, negs_per_pos, pos_sample.t()).t()  # [num_neg_edges, 2]
-        torch.save(neg_sample, negs_name)
-    # make sure these are the correct negative samples with source nodes corresponding to the positive samples
+        neg_sample = train_dataset.neg_edges[:n_pos_samples * negs_per_pos]  # [num_neg_edges, 2]
+    print(f'constructing dataset with {negs_per_pos} negative edges for each positive edge')
+    pos_sample = train_dataset.pos_edges[:n_pos_samples]  # [num_edges, 2]
+
     assert torch.all(torch.eq(pos_sample[:, 0].repeat_interleave(negs_per_pos), neg_sample[:,
                                                                                 0])), 'negatives have different source nodes to positives. Delete train_eval_negative_samples_* and subgraph features and regenerate'
     links = torch.cat([pos_sample, neg_sample], 0)  # [n_edges, 2]
@@ -383,32 +380,21 @@ def make_train_eval_data(args, train_dataset, num_nodes, n_pos_samples=5000, neg
     else:
         RA_links = None
     pos_sf = train_dataset.subgraph_features[:n_pos_samples]
-    # try to read negative subgraph features from disk or generate them
-    subgraph_cache_name, _, _ = train_dataset._generate_file_names(negs_per_pos)
-    print(f'looking for subgraph features at {subgraph_cache_name}')
-    if os.path.exists(subgraph_cache_name):
-        neg_sf = torch.load(subgraph_cache_name).to(pos_sf.device)
-        print(f"cached subgraph features found at: {subgraph_cache_name}")
-        assert neg_sf.shape[0] == len(
-            neg_sample * negs_per_pos), 'subgraph features are a different shape link object. Delete subgraph features file and regenerate'
-    else:  # generate negative subgraph features
-        #  we're going to need the hashes
-        file_stub = dataset_name.replace('-', '_')  # pyg likes to add -
-        if args.max_hash_hops == 3:
-            hash_name = f'{ROOT_DIR}/dataset/{dataset_name}/{file_stub}_elph__train_3hop_hashcache.pt'
+    if n_negs_per_pos is not None and n_negs_per_pos > negs_per_pos:
+        start_time = time()
+        if train_dataset.use_grape:
+            # use grape Tensor[n_edges, max_hops(max_hops+2)]
+            overlap, left, right = train_dataset.construct_grape_features(num_nodes, neg_sample)
+            # use grape Tensor[n_edges, max_hops(max_hops+2)]
+            neg_sf = torch.cat([overlap, left, right], dim=1)
         else:
-            hash_name = f'{ROOT_DIR}/dataset/{dataset_name}/{file_stub}_elph__train_hashcache.pt'
-        print(f'looking for hashes at {hash_name}')
-        eh = ElphHashes(args)
-        if os.path.exists(hash_name):
-            hashes = torch.load(hash_name)
-            print(f"cached hashes found at: {hash_name}")
-        else:  # need to generate the hashes, but this is a corner case as they should have been generated to make the training dataset
-            hashes, cards = eh.build_hash_tables(num_nodes, train_dataset.edge_index)
-            torch.save(hashes, hash_name)
-        print('caching subgraph features for negative samples to evaluate training performance')
-        neg_sf = eh.get_subgraph_features(neg_sample, hashes, cards)
-        torch.save(neg_sf, subgraph_cache_name)
+            hashes, cards = train_dataset.elph_hashes.build_hash_tables(num_nodes, train_dataset.edge_index)
+            print(f'Preprocessed hashes in: {time() - start_time:.2f} seconds. Constructing subgraph features')
+            neg_sf = train_dataset.elph_hashes.get_subgraph_features(neg_sample, hashes, cards)
+    else:
+        neg_sf = train_dataset.subgraph_features[n_pos_edges: n_pos_edges + len(neg_sample)]
+    # check these indices are all negative samples
+    assert sum(train_dataset.labels[n_pos_edges: n_pos_edges + len(neg_sample)]) == 0
     subgraph_features = torch.cat([pos_sf, neg_sf], dim=0)
     train_eval_dataset = HashedTrainEvalDataset(links, labels, subgraph_features, RA_links, train_dataset)
     return train_eval_dataset

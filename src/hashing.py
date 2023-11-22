@@ -324,10 +324,6 @@ class ElphHashes(object):
                 raise NotImplementedError("Only 1, 2 and 3 hop hashes are implemented")
             if not self.use_zero_one:
                 features[:, self._get_knock_out_cols()] = 0
-            if self.floor_sf:  # should be more accurate, but in practice makes no difference
-                print(
-                    f'setting {torch.sum(features[features < 0]).item()} negative values to zero')
-                features[features < 0] = 0
             all_features.append(features)
         features = torch.cat(all_features, dim=0)
         return features

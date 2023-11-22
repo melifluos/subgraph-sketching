@@ -156,7 +156,6 @@ if __name__ == '__main__':
     parser.add_argument('--preprocessing', type=str, default=None)
     parser.add_argument('--sign_k', type=int, default=0)
     parser.add_argument('--load_features', action='store_true', help='load node features from disk')
-    parser.add_argument('--load_hashes', action='store_true', help='load hashes from disk')
     parser.add_argument('--cache_subgraph_features', action='store_true',
                         help='write / read subgraph features from disk')
     parser.add_argument('--train_cache_size', type=int, default=inf, help='the number of training edges to cache')
