@@ -116,6 +116,21 @@ class ELPHDatasetTests(unittest.TestCase):
         ei = self.edge_index
         data = Data(self.x, ei)
         root = f'{ROOT_DIR}/test/dataset/test_HashedDynamicDataset'
+        self.args.dataset_name = 'test_dataset'
+        hdd = HashDataset(root, split, data, pos_edges, neg_edges, self.args, use_coalesce=False,
+                          directed=False)
+        train_eval_dataset = make_train_eval_data(self.args, hdd, self.n_nodes, n_pos_samples=n_pos_samples,
+                                                  negs_per_pos=negs_per_pos)
+        self.assertTrue(len(train_eval_dataset.links) == (negs_per_pos + 1) * n_pos_samples)
+        self.assertTrue(len(train_eval_dataset.labels) == (negs_per_pos + 1) * n_pos_samples)
+        self.assertTrue(len(train_eval_dataset.subgraph_features) == (negs_per_pos + 1) * n_pos_samples)
+        self.args.use_RA = True
+        hdd = HashDataset(root, split, data, pos_edges, neg_edges, self.args, use_coalesce=False,
+                          directed=False)
+        train_eval_dataset = make_train_eval_data(self.args, hdd, self.n_nodes, n_pos_samples=n_pos_samples,
+                                                  negs_per_pos=negs_per_pos)
+        self.assertTrue(len(train_eval_dataset.RA) == (negs_per_pos + 1) * n_pos_samples)
+        self.args.max_hash_hops = 3
         hdd = HashDataset(root, split, data, pos_edges, neg_edges, self.args, use_coalesce=False,
                           directed=False)
         train_eval_dataset = make_train_eval_data(self.args, hdd, self.n_nodes, n_pos_samples=n_pos_samples,
