@@ -45,8 +45,8 @@ class HashDataset(Dataset):
         self.use_coalesce = use_coalesce
         self.directed = directed
         self.args = args
+        self.remove_edge_bias = bool(args.remove_edge_bias)
         self.load_features = args.load_features
-        self.load_hashes = args.load_hashes
         self.use_zero_one = args.use_zero_one
         self.cache_subgraph_features = args.cache_subgraph_features
         self.max_hash_hops = args.max_hash_hops
@@ -175,8 +175,17 @@ class HashDataset(Dataset):
             year_str = f'year_{self.args.year}'
         else:
             year_str = ''
-        grape_str = '_grape' if self.use_grape else ''
         hll_str = f'_hllp{self.hll_p}'
+        if self.use_grape:
+            grape_str = '_grape'
+            if self.use_grape_exact:
+                hll_str = ''
+                if self.remove_edge_bias:
+                    grape_str += '_exact_unbiased'
+                else:
+                    grape_str += '_exact_biased'
+        else:
+            grape_str = ''
         if num_negs == 1 or self.split != 'train':
             subgraph_cache_name = f'{self.root}{self.split}{grape_str}{year_str}'
         else:
@@ -222,13 +231,16 @@ class HashDataset(Dataset):
                                                                     links[:, 1].cpu().numpy().astype(
                                                                         np.uint32))
         else:
+            #todo remove after testing grape_exact
+            print("USING EXACT GRAPE")
             overlaps, lefts, rights = [], [], []
             for (src, dst) in tqdm(links):
                 overlap, left, right = graph.get_exact_edge_sketching_from_edge_node_ids(
                     src=src,
                     dst=dst,
                     include_selfloops=True,
-                    number_of_hops=2,
+                    number_of_hops=self.max_hash_hops,
+                    remove_edge_bias=self.remove_edge_bias,
                 )
                 overlaps.append(overlap)
                 lefts.append(left)
@@ -242,7 +254,6 @@ class HashDataset(Dataset):
         right = torch.tensor(edge_df["right_difference"].reshape(edge_df["right_difference"].shape[0], -1))
 
         return overlap, left, right
-
 
     def _preprocess_subgraph_features(self, device, num_nodes, num_negs=1):
         """
@@ -261,9 +272,12 @@ class HashDataset(Dataset):
                 overlap, left, right = self.construct_grape_features(num_nodes, self.links)
                 # use grape Tensor[n_edges, max_hops(max_hops+2)]
                 self.subgraph_features = torch.cat([overlap, left, right], dim=1)
+                # todo remove after testing grape_exact
+                # assert self.max_hash_hops == 2 and self.use_grape_exact == True, 'grape_exact only implemented for 2 hops'
+                # self.subgraph_features[:, [4, 6]] = 0
             else:
                 hashes, cards = self.elph_hashes.build_hash_tables(num_nodes, self.edge_index)
-                print(f'Preprocessed hashes in: {time()-start_time:.2f} seconds. Constructing subgraph features')
+                print(f'Preprocessed hashes in: {time() - start_time:.2f} seconds. Constructing subgraph features')
                 self.subgraph_features = self.elph_hashes.get_subgraph_features(self.links, hashes, cards,
                                                                                 self.args.subgraph_feature_batch_size)
 

@@ -44,6 +44,7 @@ def set_seed(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
+
 def run(args):
     args = initialise_wandb(args)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -98,11 +99,11 @@ def run(args):
             print(wandb_results)
             if args.wandb:
                 wandb.log(wandb_results)
-        if args.wandb:
-            wandb.finish()
-        if args.save_model:
-            path = f'{ROOT_DIR}/saved_models/{args.dataset_name}'
-            torch.save(model.state_dict(), path)
+    if args.wandb:
+        wandb.finish()
+    if args.save_model:
+        path = f'{ROOT_DIR}/saved_models/{args.dataset_name}'
+        torch.save(model.state_dict(), path)
 
 
 def select_model(args, dataset, emb, device):
@@ -234,6 +235,9 @@ if __name__ == '__main__':
     parser.add_argument('--subgraph_feature_batch_size', type=int, default=11000000,
                         help='the number of edges to use in each batch when calculating subgraph features. '
                              'Reduce this or increase system RAM if seeing killed messages for large graphs')
+    parser.add_argument('--remove_edge_bias', type=str2bool, default=1,
+                        help='the features are biased because for positive edges (i,j) we do not remove the edge i-j.' 
+                             'Adding this flag will do this in the graph_exact method, but is very slow')
     # wandb settings
     parser.add_argument('--wandb', action='store_true', help="flag if logging to wandb")
     parser.add_argument('--wandb_offline', dest='use_wandb_offline',

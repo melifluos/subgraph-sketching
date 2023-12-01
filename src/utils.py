@@ -139,5 +139,7 @@ def str2bool(x):
         return x
     elif type(x) == str:
         return bool(strtobool(x))
+    elif type(x) == int:
+        return bool(x)
     else:
         raise ValueError(f'Unrecognised type {type(x)}')
