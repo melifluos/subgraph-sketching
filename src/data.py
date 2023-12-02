@@ -4,15 +4,19 @@ Read and split ogb and planetoid datasets
 
 import os
 import time
+from typing import Optional, Tuple, Union
+
 
 import torch
 from torch.utils.data import DataLoader
+from torch import Tensor
 from ogb.linkproppred import PygLinkPropPredDataset
 from torch_geometric.data import Data
 from torch_geometric.datasets import Planetoid
 from torch_geometric.transforms import RandomLinkSplit
 from torch_geometric.utils import (add_self_loops, negative_sampling,
                                    to_undirected)
+from torch_geometric.utils.num_nodes import maybe_num_nodes
 from torch_geometric.loader import DataLoader as pygDataLoader
 import wandb
 
@@ -193,7 +197,6 @@ def get_ogb_train_negs(split_edge, edge_index, num_nodes, num_negs=1, dataset_na
     """
     for some inexplicable reason ogb datasets split_edge object stores edge indices as (n_edges, 2) tensors
     @param split_edge:
-
     @param edge_index: A [2, num_edges] tensor
     @param num_nodes:
     @param num_negs: the number of negatives to sample for each positive
@@ -251,3 +254,16 @@ def use_lcc(dataset):
     )
     dataset.data = data
     return dataset
+
+def sample_hard_negatives(edge_index: Tensor,
+                      num_nodes: Optional[Union[int, Tuple[int, int]]] = None,
+                      num_neg_samples: Optional[int] = None)-> Tensor:
+    """
+    Sample hard negatives for each edge in edge_index
+    @param edge_index:
+    @return:
+    """
+    reg_negs = negative_sampling(edge_index, num_nodes, num_neg_samples)
+
+    if num_nodes is None:
+        num_nodes = maybe_num_nodes(edge_index)

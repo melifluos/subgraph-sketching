@@ -172,7 +172,7 @@ class HashDataset(Dataset):
             hop_str = ''
         end_str = f'_{hop_str}subgraph_featurecache.pt'
         if self.args.dataset_name == 'ogbl-collab' and self.args.year > 0:
-            year_str = f'year_{self.args.year}'
+            year_str = f'_year_{self.args.year}'
         else:
             year_str = ''
         hll_str = f'_hllp{self.hll_p}'

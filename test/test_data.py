@@ -8,10 +8,12 @@ from argparse import Namespace
 import torch
 from torch import tensor
 from torch_geometric.data import Data
-from torch_geometric.utils import to_undirected, is_undirected
+from torch_geometric.utils import to_undirected, is_undirected, negative_sampling, from_networkx
 from ogb.linkproppred import PygLinkPropPredDataset
+import networkx as nx
 
-from src.data import get_data, get_ogb_train_negs, make_obg_supervision_edges, get_ogb_data, get_loaders
+from src.data import get_data, get_ogb_train_negs, make_obg_supervision_edges, get_ogb_data, get_loaders, \
+    sample_hard_negatives
 from src.utils import ROOT_DIR, get_pos_neg_edges
 from test_params import OPT
 
@@ -25,8 +27,10 @@ class DataTests(unittest.TestCase):
         self.neg_test_edges = tensor([[0, 1], [2, 0]]).t()
         edges = 8
         self.train = {'edge': torch.randint(0, edges, size=(edges, 2))}
-        self.valid = {'edge': torch.randint(0, edges, size=(edges, 2)), 'edge_neg': torch.randint(0, edges, size=(edges, 2))}
-        self.test = {'edge': torch.randint(0, edges, size=(edges, 2)), 'edge_neg': torch.randint(0, edges, size=(edges, 2))}
+        self.valid = {'edge': torch.randint(0, edges, size=(edges, 2)),
+                      'edge_neg': torch.randint(0, edges, size=(edges, 2))}
+        self.test = {'edge': torch.randint(0, edges, size=(edges, 2)),
+                     'edge_neg': torch.randint(0, edges, size=(edges, 2))}
         self.split_edge = {'train': self.train, 'valid': self.valid, 'test': self.test}
 
     def test_make_obg_supervision_edges(self):
@@ -104,3 +108,14 @@ class DataTests(unittest.TestCase):
         dataset, splits, directed, eval_metric = get_data(args)
         train_loader, train_eval_loader, val_loader, test_loader = get_loaders(args, dataset, splits, directed)
         # todo finish writing this test
+
+    def test_sample_hard_negatives(self):
+        grid_size = 4  # For a 4x4 grid
+        G = nx.grid_2d_graph(grid_size, grid_size)
+        data = from_networkx(G)
+        edge_index = data.edge_index
+        edge_index = to_undirected(edge_index)
+
+        reg_negs = negative_sampling(edge_index, num_nodes=self.num_nodes)
+        sample_hard_negatives(edge_index, G.num_nodes)
+        negs = sample_hard_negatives(self.edge_index, self.num_nodes)

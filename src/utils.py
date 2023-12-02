@@ -4,7 +4,6 @@ utility functions and global variables
 
 import os
 from distutils.util import strtobool
-from math import inf
 
 import torch
 import numpy as np
