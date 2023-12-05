@@ -8,10 +8,12 @@ from argparse import Namespace
 import torch
 from torch import tensor
 from torch_geometric.data import Data
-from torch_geometric.utils import to_undirected, is_undirected
+from torch_geometric.utils import to_undirected, is_undirected, negative_sampling, from_networkx
 from ogb.linkproppred import PygLinkPropPredDataset
+import networkx as nx
 
-from src.data import get_data, get_ogb_train_negs, make_obg_supervision_edges, get_ogb_data, get_loaders
+from src.data import get_data, get_ogb_train_negs, make_obg_supervision_edges, get_ogb_data, get_loaders, \
+    sample_hard_negatives
 from src.utils import ROOT_DIR, get_pos_neg_edges
 from test_params import OPT
 
@@ -104,3 +106,12 @@ class DataTests(unittest.TestCase):
         dataset, splits, directed, eval_metric = get_data(args)
         train_loader, train_eval_loader, val_loader, test_loader = get_loaders(args, dataset, splits, directed)
         # todo finish writing this test
+
+    def test_sample_hard_negatives(self):
+        grid_size = 4  # For a 4x4 grid
+        G = nx.grid_2d_graph(grid_size, grid_size)
+        data = from_networkx(G)
+        edge_index = data.edge_index  # this is undirected
+        reg_negs = negative_sampling(edge_index, num_nodes=len(G.nodes), num_neg_samples=10)
+        sample_hard_negatives(edge_index, len(G.nodes))
+        negs = sample_hard_negatives(self.edge_index, len(G.nodes))

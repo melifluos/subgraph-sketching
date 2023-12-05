@@ -4,19 +4,25 @@ Read and split ogb and planetoid datasets
 
 import os
 import time
+from typing import Optional, Tuple, Union
+import itertools
 
+import numpy as np
 import torch
 from torch.utils.data import DataLoader
+from torch import Tensor
 from ogb.linkproppred import PygLinkPropPredDataset
 from torch_geometric.data import Data
 from torch_geometric.datasets import Planetoid
 from torch_geometric.transforms import RandomLinkSplit
 from torch_geometric.utils import (add_self_loops, negative_sampling,
                                    to_undirected)
+from torch_geometric.utils.negative_sampling import vector_to_edge_index, edge_index_to_vector, sample
+from torch_geometric.utils.num_nodes import maybe_num_nodes
 from torch_geometric.loader import DataLoader as pygDataLoader
 import wandb
 
-from src.utils import ROOT_DIR, get_same_source_negs
+from src.utils import ROOT_DIR, get_same_source_negs, neighbors
 from src.lcc import get_largest_connected_component, remap_edges, get_node_mapper
 from src.datasets.seal import get_train_val_test_datasets
 from src.datasets.elph import get_hashed_train_val_test_datasets, make_train_eval_data
@@ -252,3 +258,52 @@ def use_lcc(dataset):
     )
     dataset.data = data
     return dataset
+
+def sample_hard_negatives(edge_index: Tensor,
+                      num_nodes: Optional[Union[int, Tuple[int, int]]] = None,
+                      num_neg_samples: Optional[int] = None)-> Tensor:
+    """
+    Sample hard negatives for each edge in edge_index
+    @param edge_index:
+    @return:
+    """
+    if num_nodes is None:
+        num_nodes = maybe_num_nodes(edge_index)
+    # get the size of the population of edges and the index of the existing edges into this population
+    idx, population = edge_index_to_vector(edge_index, (num_nodes, num_nodes), bipartite=False)
+    # for each node, get all of the neighbours and produce all edges that have that node as a common neigbour
+    common_neighbour_edges = []
+    for node in range(num_nodes):
+        neighbours = edge_index[1, edge_index[0] == node]
+        # get all edges that have a common neighbour with node
+        edges = list(itertools.combinations(neighbours, 2))
+        common_neighbour_edges.extend(edges)
+    unique_common_neighbour_edges = list(set(common_neighbour_edges))
+    # get the unique edges that are not in the graph
+    # 1. turn this into an edge index
+    # 2. get the index of the common neighbour edges into the population
+    # 3. get common neighbours that are not in the graph
+    # 4. maybe sample
+
+
+    # get the index of the common neighbour edges into the population
+
+
+    # sample num_neg_samples edges from the population of common neighbour edges
+    idx = idx.to('cpu')
+    for _ in range(3):  # Number of tries to sample negative indices.
+        rnd = sample(population, num_neg_samples, device='cpu')
+        mask = np.isin(rnd, idx)
+        if neg_idx is not None:
+            mask |= np.isin(rnd, neg_idx.to('cpu'))
+        mask = torch.from_numpy(mask).to(torch.bool)
+        rnd = rnd[~mask].to(edge_index.device)
+        neg_idx = rnd if neg_idx is None else torch.cat([neg_idx, rnd])
+        if neg_idx.numel() >= num_neg_samples:
+            neg_idx = neg_idx[:num_neg_samples]
+            break
+
+
+
+
+
