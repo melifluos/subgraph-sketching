@@ -191,6 +191,7 @@ if __name__ == '__main__':
                         help='the size of the label embedding table. ie. the maximum number of labels possible')
     parser.add_argument('--use_feature', type=str2bool, default=True,
                         help="whether to use raw node features as GNN input")
+    parser.add_argument('--use_unbiased_feature', type=str2bool, default=False)
     parser.add_argument('--use_struct_feature', type=str2bool, default=True,
                         help="whether to use structural graph features as GNN input")
     parser.add_argument('--use_edge_weight', action='store_true',
@@ -236,8 +237,11 @@ if __name__ == '__main__':
                         help='the number of edges to use in each batch when calculating subgraph features. '
                              'Reduce this or increase system RAM if seeing killed messages for large graphs')
     parser.add_argument('--remove_edge_bias', type=str2bool, default=1,
-                        help='the features are biased because for positive edges (i,j) we do not remove the edge i-j.' 
+                        help='the features are biased because for positive edges (i,j) we do not remove the edge i-j.'
                              'Adding this flag will do this in the graph_exact method, but is very slow')
+    parser.add_argument('--normalise_grape', type=str2bool, default=0, help='normalise the grape features')
+    parser.add_argument('--self_loops', type=str2bool, default=1,
+                        help='use self loops when calculating subgraph features')
     # wandb settings
     parser.add_argument('--wandb', action='store_true', help="flag if logging to wandb")
     parser.add_argument('--wandb_offline', dest='use_wandb_offline',
@@ -264,5 +268,5 @@ if __name__ == '__main__':
     if args.dataset_name == 'ogbl-ddi':
         args.use_feature = 0  # dataset has no features
         assert args.sign_k > 0, '--sign_k must be set to > 0 i.e. 1,2 or 3 for ogbl-ddi'
-    print(args)
+    assert not args.use_feature and args.use_unbiased_feature
     run(args)

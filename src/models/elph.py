@@ -228,6 +228,8 @@ class BUDDY(torch.nn.Module):
         super(BUDDY, self).__init__()
 
         self.use_feature = args.use_feature
+        # use node features that are propagated for each positive edge with edge i-j removed. Same for negatives
+        self.use_unbiased_feature = args.use_unbiased_feature
         self.label_dropout = args.label_dropout
         self.feature_dropout = args.feature_dropout
         self.node_embedding = node_embedding
@@ -321,7 +323,7 @@ class BUDDY(torch.nn.Module):
 
         return x
 
-    def forward(self, sf, node_features, src_degree=None, dst_degree=None, RA=None, emb=None):
+    def forward(self, sf, node_features, src_degree=None, dst_degree=None, RA=None, emb=None, unbiased_features=None):
         """
         forward pass for one batch of edges
         @param sf: subgraph features [batch_size, num_hops*(num_hops+2)]
@@ -338,6 +340,8 @@ class BUDDY(torch.nn.Module):
         x = self.bn_labels(x)
         x = F.relu(x)
         x = F.dropout(x, p=self.label_dropout, training=self.training)
+        if self.use_unbiased_feature:
+            x = torch.cat(x, unbiased_features)
         if self.use_feature:
             node_features = self.feature_forward(node_features)
             x = torch.cat([x, node_features.to(torch.float)], 1)

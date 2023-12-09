@@ -10,18 +10,16 @@ import pandas as pd
 import scipy.sparse as ssp
 import torch
 import torch_sparse
-from embiggen.embedders.ensmallen_embedders.hyper_sketching import \
-    HyperSketching
+from embiggen.embedders.ensmallen_embedders.hyper_sketching import HyperSketching
 from grape import Graph
 from torch_geometric.data import Dataset
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
 from torch_geometric.utils import to_undirected
 from torch_sparse import coalesce
-from tqdm import tqdm
 
 from src.hashing import ElphHashes
 from src.heuristics import RA
-from src.utils import (ROOT_DIR, get_pos_neg_edges, get_same_source_negs,
+from src.utils import (get_pos_neg_edges, get_same_source_negs,
                        get_src_dst_degree)
 
 
@@ -33,7 +31,7 @@ class HashDataset(Dataset):
 
     def __init__(
             self, root, split, data, pos_edges, neg_edges, args, use_coalesce=False,
-            directed=False, **kwargs):
+            directed=False, use_unbiased_feature=False, **kwargs):
         if args.model != 'ELPH':  # elph stores the hashes directly in the model class for message passing
             self.elph_hashes = ElphHashes(args)  # object for hash and subgraph feature operations
         self.split = split  # string: train, valid or test
@@ -46,10 +44,13 @@ class HashDataset(Dataset):
         self.directed = directed
         self.args = args
         self.remove_edge_bias = bool(args.remove_edge_bias)
+        self.normalise_grape = bool(args.normalise_grape)
         self.load_features = args.load_features
+        self.use_unbiased_feature = use_unbiased_feature
         self.use_zero_one = args.use_zero_one
         self.cache_subgraph_features = args.cache_subgraph_features
         self.max_hash_hops = args.max_hash_hops
+        self.self_loops = args.self_loops
         self.use_feature = args.use_feature
         self.use_RA = args.use_RA
         self.hll_p = args.hll_p
@@ -88,6 +89,9 @@ class HashDataset(Dataset):
         if args.model == 'ELPH':  # features propagated in the model instead of preprocessed
             self.x = data.x
         else:
+            if self.use_unbiased_feature:
+                self.unbiased_features = self._preprocess_unbiased_node_features(data, self.edge_index,
+                                                                                 self.edge_weight, args.sign_k)
             self.x = self._preprocess_node_features(data, self.edge_index, self.edge_weight, args.sign_k)
             # ELPH does hashing and feature prop on the fly
             # either set self.hashes or self.subgraph_features depending on cmd args
@@ -108,7 +112,7 @@ class HashDataset(Dataset):
         edge_index, edge_weight = gcn_norm(  # yapf: disable
             edge_index, edge_weight.float(), num_nodes)
         if sign_k == 0:
-            # for most datasets it works best do one step of propagation
+            # for most datasets it works best do one step of propagation instead of using the raw features
             xs = torch_sparse.spmm(edge_index, edge_weight, data.x.shape[0], data.x.shape[0], data.x)
         else:
             xs = [data.x]
@@ -120,7 +124,7 @@ class HashDataset(Dataset):
 
     def _preprocess_node_features(self, data, edge_index, edge_weight, sign_k=0):
         """
-        preprocess the node features
+        preprocess the node features by propagating them using the SIGN method
         @param data: pyg Data object
         @param edge_weight: pyg edge index Int Tensor [edges, 2]
         @param sign_k: the number of propagation steps used by SIGN
@@ -141,6 +145,39 @@ class HashDataset(Dataset):
             if self.load_features:
                 torch.save(x.cpu(), feature_name)
         return x
+
+    def _preprocess_unbiased_node_features(self, data, edge_index, edge_weight, sign_k=0):
+        """
+        Propagating the node features at training time over all edges in the graph introduces a bias because
+        the message passing edges are the same as the supervision edges at training time. This method propagates the
+        node features one edge at a time generating features for edge ij with edge ij omitted from the graph
+        @param edge_index:
+        @return:
+        @param data: pyg Data object
+        @param edge_weight: pyg edge index Int Tensor [edges, 2]
+        @param sign_k: the number of propagation steps used by SIGN
+        @return: Float Tensor [num_nodes, hidden_dim]
+        """
+        # todo:
+        # 1. test this method
+        feature_name = f'{self.root}_{self.split}_k{sign_k}_unbiased_feature_cache.pt'
+        try:
+            return torch.load(feature_name).to(edge_index.device)
+        except FileNotFoundError:
+            print(f'no unbiased features found at {feature_name}. Generating unbiased features')
+
+        unbiased_features = []
+        for edge in edge_index.t():
+            u, v = edge[0], edge[1]
+            mask = ~((edge_index[0] == u) & (edge_index[1] == v) |
+                     (edge_index[0] == v) & (edge_index[1] == u))
+            x = self._preprocess_node_features(data, edge_index[:, mask], edge_weight[:, mask], sign_k)
+            feat = x[u] * x[v]
+            unbiased_features.append(feat)
+        unbiased_features = torch.stack(unbiased_features, dim=0)
+        torch.save(unbiased_features.cpu(), feature_name)
+
+        return unbiased_features
 
     def _read_subgraph_features(self, name: str, device: torch.device) -> bool:
         """
@@ -209,8 +246,10 @@ class HashDataset(Dataset):
             number_of_hops=self.max_hash_hops,
             precision=self.args.hll_p,
             bits=6,
-
-            normalize_by_symmetric_laplacian=False,
+            include_selfloops=self.self_loops,
+            normalize=self.normalise_grape,
+            unbiased=self.remove_edge_bias,
+            exact=self.use_grape_exact,
             zero_out_differences_cardinalities=not self.use_zero_one,
             include_node_types=False,
             include_edge_types=False,
@@ -220,40 +259,41 @@ class HashDataset(Dataset):
             {'src': self.edge_index[0].cpu().numpy(), 'dst': self.edge_index[1].cpu().numpy()}),
             edge_src_column='src', edge_dst_column='dst', directed=False, nodes_df=node_df)
 
-        if not self.use_grape_exact:
-            sketching.fit(graph)
-            # edge_df is a dict with keys {"overlap": np.array,
-            # "left_difference": np.array, "right_difference:" np.array}
-            # double check cpu-> numpy offloading
-            edge_df = sketching.get_edge_feature_from_edge_node_ids(graph,
-                                                                    links[:, 0].cpu().numpy().astype(
-                                                                        np.uint32),
-                                                                    links[:, 1].cpu().numpy().astype(
-                                                                        np.uint32))
-        else:
-            #todo remove after testing grape_exact
-            print("USING EXACT GRAPE")
-            overlaps, lefts, rights = [], [], []
-            for (src, dst) in tqdm(links):
-                overlap, left, right = graph.get_exact_edge_sketching_from_edge_node_ids(
-                    src=src,
-                    dst=dst,
-                    include_selfloops=True,
-                    number_of_hops=self.max_hash_hops,
-                    remove_edge_bias=self.remove_edge_bias,
-                )
-                overlaps.append(overlap)
-                lefts.append(left)
-                rights.append(right)
-            edge_df = {"overlap": np.stack(overlaps).astype(np.float32),
-                       "left_difference": np.vstack(lefts).astype(np.float32),
-                       "right_difference": np.vstack(rights).astype(np.float32)}
+        # if not self.use_grape_exact:
+        sketching.fit(graph)
+        print(f'generated sketches for {graph.get_name()}. Graph has diameter {graph.get_diameter()}')
+        # edge_df is a dict with keys {"overlap": np.array,
+        # "left_difference": np.array, "right_difference:" np.array}
+        # double check cpu-> numpy offloading
+        edge_df = sketching.get_edge_feature_from_edge_node_ids(graph,
+                                                                links[:, 0].cpu().numpy().astype(
+                                                                    np.uint32),
+                                                                links[:, 1].cpu().numpy().astype(
+                                                                    np.uint32))
+        # else:
+        #     #todo remove after testing grape_exact
+        #     print("USING EXACT GRAPE")
+        #     overlaps, lefts, rights = [], [], []
+        #     for (src, dst) in tqdm(links):
+        #         overlap, left, right = graph.get_exact_edge_sketching_from_edge_node_ids(
+        #             src=src,
+        #             dst=dst,
+        #             include_selfloops=True,
+        #             number_of_hops=self.max_hash_hops,
+        #             remove_edge_bias=self.remove_edge_bias,
+        #         )
+        #         overlaps.append(overlap)
+        #         lefts.append(left)
+        #         rights.append(right)
+        #     edge_df = {"overlap": np.stack(overlaps).astype(np.float32),
+        #                "left_difference": np.vstack(lefts).astype(np.float32),
+        #                "right_difference": np.vstack(rights).astype(np.float32)}
 
-        overlap = torch.tensor(edge_df["overlap"].reshape(edge_df["overlap"].shape[0], -1))
-        left = torch.tensor(edge_df["left_difference"].reshape(edge_df["left_difference"].shape[0], -1))
-        right = torch.tensor(edge_df["right_difference"].reshape(edge_df["right_difference"].shape[0], -1))
+        # overlap = torch.tensor(edge_df["overlap"].reshape(edge_df["overlap"].shape[0], -1))
+        # left = torch.tensor(edge_df["left_difference"].reshape(edge_df["left_difference"].shape[0], -1))
+        # right = torch.tensor(edge_df["right_difference"].reshape(edge_df["right_difference"].shape[0], -1))
 
-        return overlap, left, right
+        return torch.tensor(edge_df['edge_features'])
 
     def _preprocess_subgraph_features(self, device, num_nodes, num_negs=1):
         """
@@ -269,9 +309,10 @@ class HashDataset(Dataset):
             start_time = time()
             if self.use_grape:
                 # use grape Tensor[n_edges, max_hops(max_hops+2)]
-                overlap, left, right = self.construct_grape_features(num_nodes, self.links)
+                # overlap, left, right = self.construct_grape_features(num_nodes, self.links)
+                self.subgraph_features = self.construct_grape_features(num_nodes, self.links)
                 # use grape Tensor[n_edges, max_hops(max_hops+2)]
-                self.subgraph_features = torch.cat([overlap, left, right], dim=1)
+                # self.subgraph_features = torch.cat([overlap, left, right], dim=1)
                 # todo remove after testing grape_exact
                 # assert self.max_hash_hops == 2 and self.use_grape_exact == True, 'grape_exact only implemented for 2 hops'
                 # self.subgraph_features[:, [4, 6]] = 0
@@ -325,7 +366,8 @@ def get_hashed_train_val_test_datasets(dataset, train_data, val_data, test_data,
         f'and {pos_test_edge.shape[0]} pos, {neg_test_edge.shape[0]} neg test edges for supervision')
     print('constructing training dataset object')
     train_dataset = HashDataset(root, 'train', train_data, pos_train_edge, neg_train_edge, args,
-                                use_coalesce=use_coalesce, directed=directed)
+                                use_coalesce=use_coalesce, directed=directed,
+                                use_unbiased_feature=args.use_unbiased_feature)
     print('constructing validation dataset object')
     val_dataset = HashDataset(root, 'valid', val_data, pos_val_edge, neg_val_edge, args,
                               use_coalesce=use_coalesce, directed=directed)
