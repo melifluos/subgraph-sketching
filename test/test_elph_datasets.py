@@ -22,12 +22,14 @@ class ELPHDatasetTests(unittest.TestCase):
         self.n_nodes = 30
         degree = 5
         self.n_edges = 10  # number of positive training edges
-        self.x = torch.rand((self.n_nodes, 2))
+        self.n_features = 2
+        self.x = torch.rand((self.n_nodes, self.n_features))
         self.edge_index = barabasi_albert_graph(self.n_nodes, degree)
         self.edge_weight = torch.ones(self.edge_index.shape[1])
         self.A = ssp.csr_matrix((self.edge_weight, (self.edge_index[0], self.edge_index[1])),
                                 shape=(self.n_nodes, self.n_nodes))
-        self.pos_edges = torch.randint(self.n_nodes, (self.n_edges, 2))
+        indices = torch.randperm(self.edge_index.shape[1])[:self.n_edges]
+        self.pos_edges = self.edge_index[:, indices].T
         self.neg_edges = torch.randint(self.n_nodes, (self.n_edges, 2))
 
         self.args = Namespace(**OPT)
@@ -92,6 +94,20 @@ class ELPHDatasetTests(unittest.TestCase):
 
     def test_preprocess_features(self):
         pass
+
+
+    def test_get_unbiased_features(self):
+        root = f'{ROOT_DIR}/test/dataset/test_HashedDynamicDataset'
+        split = 'train'
+        ei = self.edge_index
+        data = Data(self.x, ei)
+        hdd = HashDataset(root, split, data, self.pos_edges, self.neg_edges, self.args, use_coalesce=False,
+                          directed=False,
+                          load_features=True)
+        unbiased_features = hdd._preprocess_unbiased_node_features(hdd, ei, self.edge_weight)
+        self.assertTrue(unbiased_features.shape == (len(hdd.links), self.n_features * (self.args.sign_k + 1)))
+        self.assertTrue(unbiased_features.shape[0] == len(self.pos_edges) + len(self.neg_edges))
+
 
     def test_read_subgraph_features(self):
         pass
