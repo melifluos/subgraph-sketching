@@ -99,14 +99,36 @@ class ELPHDatasetTests(unittest.TestCase):
     def test_get_unbiased_features(self):
         root = f'{ROOT_DIR}/test/dataset/test_HashedDynamicDataset'
         split = 'train'
+        feature_name = f'{root}_{split}_k{self.args.sign_k}_unbiased_feature_cache.pt'
+        if os.path.exists(feature_name): os.remove(feature_name)
         ei = self.edge_index
         data = Data(self.x, ei)
         hdd = HashDataset(root, split, data, self.pos_edges, self.neg_edges, self.args, use_coalesce=False,
-                          directed=False,
-                          load_features=True)
+                          directed=False, load_features=True, use_unbiased_feature=True)
         unbiased_features = hdd._preprocess_unbiased_node_features(hdd, ei, self.edge_weight)
+        os.remove(feature_name)
         self.assertTrue(unbiased_features.shape == (len(hdd.links), self.n_features * (self.args.sign_k + 1)))
         self.assertTrue(unbiased_features.shape[0] == len(self.pos_edges) + len(self.neg_edges))
+
+        hdd = HashDataset(root, split, data, self.pos_edges, self.neg_edges, self.args, use_coalesce=False,
+                          directed=False, load_features=True, use_unbiased_feature=True)
+        ubf = hdd.unbiased_features
+        self.assertTrue(torch.all(torch.eq(ubf, unbiased_features)))
+        self.assertTrue(ubf.shape == (len(hdd.links), self.n_features * (self.args.sign_k + 1)))
+        self.assertTrue(ubf.shape[0] == len(self.pos_edges) + len(self.neg_edges))
+        # check new file is made
+        self.args.sign_k = 1
+        hdd = HashDataset(root, split, data, self.pos_edges, self.neg_edges, self.args, use_coalesce=False,
+                          directed=False, load_features=True, use_unbiased_feature=True)
+        ubf = hdd.unbiased_features
+        self.assertTrue(ubf.shape == (len(hdd.links), self.n_features * (self.args.sign_k + 1)))
+        self.assertTrue(ubf.shape[0] == len(self.pos_edges) + len(self.neg_edges))
+        # clean up
+        os.remove(feature_name)
+        new_feature_name = f'{root}_{split}_k{self.args.sign_k}_unbiased_feature_cache.pt'
+        os.remove(new_feature_name)
+
+
 
 
     def test_read_subgraph_features(self):
