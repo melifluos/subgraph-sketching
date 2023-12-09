@@ -30,7 +30,7 @@ def print_model_params(model):
 
 def get_num_samples(sample_arg, dataset_len):
     """
-    convert a sample arg that can be a number of % into a number of samples
+    convert a sample arg that can be a number or % into a number of samples
     :param sample_arg: float interpreted as % if < 1 or count if >= 1
     :param dataset_len: the number of data points before sampling
     :return:

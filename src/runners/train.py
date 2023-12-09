@@ -60,6 +60,11 @@ def train_buddy(model, optimizer, train_loader, args, device, emb=None):
             subgraph_features = data.subgraph_features[sf_indices].to(device)
         else:
             subgraph_features = torch.zeros(data.subgraph_features[indices].shape).to(device)
+        if args.use_unbiased_feature:
+            ubf_indices = sample_indices[indices]
+            unbiased_features = data.unbiased_features[ubf_indices].to(device)
+        else:
+            unbiased_features = None
         node_features = data.x[curr_links].to(device)
         degrees = data.degrees[curr_links].to(device)
         if args.use_RA:
@@ -69,7 +74,7 @@ def train_buddy(model, optimizer, train_loader, args, device, emb=None):
             RA = None
         start_time = time.time()
         optimizer.zero_grad()
-        logits = model(subgraph_features, node_features, degrees[:, 0], degrees[:, 1], RA, batch_emb)
+        logits = model(subgraph_features, node_features, degrees[:, 0], degrees[:, 1], RA, batch_emb, unbiased_features)
         loss = get_loss(args.loss)(logits, labels[indices].squeeze(0).to(device))
 
         loss.backward()
