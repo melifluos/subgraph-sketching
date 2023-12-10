@@ -69,7 +69,7 @@ class HashDataset(Dataset):
         if 'edge_weight' in data:
             self.edge_weight = data.edge_weight.view(-1)
         else:
-            self.edge_weight = torch.ones(data.edge_index.size(1), dtype=int)
+            self.edge_weight = torch.ones(data.edge_index.size(1), dtype=torch.int)
         if self.directed:  # make undirected graphs like citation2 directed
             print(
                 f'this is a directed graph. Making the adjacency matrix undirected to propagate features and calculate subgraph features')
@@ -89,10 +89,11 @@ class HashDataset(Dataset):
         if args.model == 'ELPH':  # features propagated in the model instead of preprocessed
             self.x = data.x
         else:
+            # node features are used to calculate both biased and unbiased features
+            self.x = self._preprocess_node_features(data, self.edge_index, self.edge_weight)
             if self.use_unbiased_feature:
                 self.unbiased_features = self._preprocess_unbiased_node_features(data, self.edge_index,
-                                                                                 self.edge_weight, args.sign_k)
-            self.x = self._preprocess_node_features(data, self.edge_index, self.edge_weight, args.sign_k)
+                                                                                 self.edge_weight)
             # ELPH does hashing and feature prop on the fly
             # either set self.hashes or self.subgraph_features depending on cmd args
             self._preprocess_subgraph_features(self.edge_index.device, data.num_nodes, args.num_negs)
@@ -122,7 +123,7 @@ class HashDataset(Dataset):
             xs = torch.cat(xs, dim=-1)
         return xs
 
-    def _preprocess_node_features(self, data, edge_index, edge_weight, sign_k=0):
+    def _preprocess_node_features(self, data, edge_index, edge_weight, verbose=False):
         """
         preprocess the node features by propagating them using the SIGN method
         @param data: pyg Data object
@@ -130,53 +131,69 @@ class HashDataset(Dataset):
         @param sign_k: the number of propagation steps used by SIGN
         @return: Float Tensor [num_nodes, hidden_dim]
         """
-        if sign_k == 0:
+        sk = self.args.sign_k
+        if sk == 0:
             feature_name = f'{self.root}_{self.split}_featurecache.pt'
         else:
-            feature_name = f'{self.root}_{self.split}_k{sign_k}_featurecache.pt'
+            feature_name = f'{self.root}_{self.split}_k{sk}_featurecache.pt'
         if self.load_features and os.path.exists(feature_name):
             print('loading node features from disk')
             x = torch.load(feature_name).to(edge_index.device)
         else:
-            print('constructing node features')
-            start_time = time()
-            x = self._generate_sign_features(data, edge_index, edge_weight, sign_k)
-            print("Preprocessed features in: {:.2f} seconds".format(time() - start_time))
+            if verbose:
+                print('constructing node features')
+                start_time = time()
+            x = self._generate_sign_features(data, edge_index, edge_weight, sk)
+            if verbose:
+                print("Preprocessed features in: {:.2f} seconds".format(time() - start_time))
             if self.load_features:
                 torch.save(x.cpu(), feature_name)
         return x
 
-    def _preprocess_unbiased_node_features(self, data, edge_index, edge_weight, sign_k=0):
+    def _preprocess_unbiased_node_features(self, data, edge_index, edge_weight):
         """
         Propagating the node features at training time over all edges in the graph introduces a bias because
         the message passing edges are the same as the supervision edges at training time. This method propagates the
-        node features one edge at a time generating features for edge ij with edge ij omitted from the graph
+        node features one edge at a time generating features for edge ij with edge ij omitted from the graph.
+        This only happens for positive features as features for negative edges can be calculated in parallel with
+        matrix multiplication as they all share the same edge index.
         @param edge_index:
-        @return:
         @param data: pyg Data object
-        @param edge_weight: pyg edge index Int Tensor [edges, 2]
+        @param edge_weight: pyg edge index Int Tensor [edges]
         @param sign_k: the number of propagation steps used by SIGN
         @return: Float Tensor [num_nodes, hidden_dim]
         """
         # todo:
         # 1. test this method
-        feature_name = f'{self.root}_{self.split}_k{sign_k}_unbiased_feature_cache.pt'
+        feature_name = f'{self.root}_{self.split}_k{self.args.sign_k}_unbiased_feature_cache.pt'
         try:
-            return torch.load(feature_name).to(edge_index.device)
+            unbiased_features = torch.load(feature_name).to(edge_index.device)
+            print(f'unbiased features found at {feature_name}.')
+            return unbiased_features
         except FileNotFoundError:
             print(f'no unbiased features found at {feature_name}. Generating unbiased features')
-
-        unbiased_features = []
-        for edge in edge_index.t():
+        pos_unbiased_features = []
+        #  don't load features from disk as we are generating them with each positive edge omitted
+        old_flag = self.load_features
+        self.load_features = False
+        for edge in self.pos_edges:
             u, v = edge[0], edge[1]
             mask = ~((edge_index[0] == u) & (edge_index[1] == v) |
                      (edge_index[0] == v) & (edge_index[1] == u))
-            x = self._preprocess_node_features(data, edge_index[:, mask], edge_weight[:, mask], sign_k)
+            assert torch.sum(mask) == edge_index.shape[1] - 2, ('either the pos edges are not in the edge index or '
+                                                                'the edge index contains duplicates')
+            x = self._preprocess_node_features(data, edge_index[:, mask], edge_weight[mask])
             feat = x[u] * x[v]
-            unbiased_features.append(feat)
-        unbiased_features = torch.stack(unbiased_features, dim=0)
-        torch.save(unbiased_features.cpu(), feature_name)
-
+            pos_unbiased_features.append(feat)
+        pos_unbiased_features = torch.stack(pos_unbiased_features, dim=0)
+        assert pos_unbiased_features.shape[0] == self.pos_edges.shape[0], ('pos unbiased features are inconsistent with '                                                                           'the link object.')
+        neg_node_features = self.x[self.neg_edges]
+        neg_unbiased_features = neg_node_features[:, 0, :] * neg_node_features[:, 1, :]
+        unbiased_features = torch.cat([pos_unbiased_features, neg_unbiased_features], dim=0)
+        assert unbiased_features.shape[0] == len(
+            self.links), 'unbiased features are inconsistent with the link object. Delete unbiased features file and regenerate'
+        self.load_features = old_flag
+        torch.save(unbiased_features, feature_name)
         return unbiased_features
 
     def _read_subgraph_features(self, name: str, device: torch.device) -> bool:

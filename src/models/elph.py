@@ -341,7 +341,8 @@ class BUDDY(torch.nn.Module):
         x = F.relu(x)
         x = F.dropout(x, p=self.label_dropout, training=self.training)
         if self.use_unbiased_feature:
-            x = torch.cat(x, unbiased_features)
+            # todo: need to pass this through an equivalent of the feature_forward function
+            x = torch.cat([x, unbiased_features.to(torch.float)], 1)
         if self.use_feature:
             node_features = self.feature_forward(node_features)
             x = torch.cat([x, node_features.to(torch.float)], 1)
