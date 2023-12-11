@@ -98,7 +98,8 @@ class HashDataset(Dataset):
             # either set self.hashes or self.subgraph_features depending on cmd args
             self._preprocess_subgraph_features(self.edge_index.device, data.num_nodes, args.num_negs)
 
-    def _generate_sign_features(self, data, edge_index, edge_weight, sign_k):
+    def _generate_sign_features(self, data, edge_index: torch.Tensor, edge_weight: torch.Tensor,
+                                sign_k: int) -> torch.Tensor:
         """
         Generate features by preprocessing using the Scalable Inception Graph Neural Networks (SIGN) method
          https://arxiv.org/abs/2004.11198
@@ -150,21 +151,19 @@ class HashDataset(Dataset):
                 torch.save(x.cpu(), feature_name)
         return x
 
-    def _preprocess_unbiased_node_features(self, data, edge_index, edge_weight):
+    def _preprocess_unbiased_node_features(self, data, edge_index: torch.Tensor,
+                                           edge_weight: torch.tensor) -> torch.Tensor:
         """
         Propagating the node features at training time over all edges in the graph introduces a bias because
         the message passing edges are the same as the supervision edges at training time. This method propagates the
         node features one edge at a time generating features for edge ij with edge ij omitted from the graph.
         This only happens for positive features as features for negative edges can be calculated in parallel with
         matrix multiplication as they all share the same edge index.
-        @param edge_index:
         @param data: pyg Data object
+        @param edge_index:
         @param edge_weight: pyg edge index Int Tensor [edges]
-        @param sign_k: the number of propagation steps used by SIGN
-        @return: Float Tensor [num_nodes, hidden_dim]
+        @return: Float Tensor [num_edges, hidden_dim]
         """
-        # todo:
-        # 1. test this method
         feature_name = f'{self.root}_{self.split}_k{self.args.sign_k}_unbiased_feature_cache.pt'
         try:
             unbiased_features = torch.load(feature_name).to(edge_index.device)
@@ -180,15 +179,20 @@ class HashDataset(Dataset):
             u, v = edge[0], edge[1]
             mask = ~((edge_index[0] == u) & (edge_index[1] == v) |
                      (edge_index[0] == v) & (edge_index[1] == u))
+            # todo: worry about self-loops. Is it possible for a self loop to be in pos_edges and then it would only
+            # be removed once and not twice causing the assertion below to fail
             assert torch.sum(mask) == edge_index.shape[1] - 2, ('either the pos edges are not in the edge index or '
                                                                 'the edge index contains duplicates')
             x = self._preprocess_node_features(data, edge_index[:, mask], edge_weight[mask])
             feat = x[u] * x[v]
             pos_unbiased_features.append(feat)
         pos_unbiased_features = torch.stack(pos_unbiased_features, dim=0)
-        assert pos_unbiased_features.shape[0] == self.pos_edges.shape[0], ('pos unbiased features are inconsistent with '                                                                           'the link object.')
+        assert pos_unbiased_features.shape[0] == self.pos_edges.shape[0], (
+            'pos unbiased features are inconsistent with '                                                                           'the link object.')
         neg_node_features = self.x[self.neg_edges]
         neg_unbiased_features = neg_node_features[:, 0, :] * neg_node_features[:, 1, :]
+        assert pos_unbiased_features.shape[1] == neg_unbiased_features.shape[
+            1], 'negative and positive unbiased feature shapes are inconsistent. This is likely because there is an old feature cache'
         unbiased_features = torch.cat([pos_unbiased_features, neg_unbiased_features], dim=0)
         assert unbiased_features.shape[0] == len(
             self.links), 'unbiased features are inconsistent with the link object. Delete unbiased features file and regenerate'

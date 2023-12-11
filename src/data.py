@@ -61,7 +61,7 @@ def get_loaders(args, dataset, splits, directed):
     return train_loader, train_eval_loader, val_loader, test_loader
 
 
-def get_data(args):
+def get_data(args) -> Tuple[Union[Planetoid,PygLinkPropPredDataset], dict, bool, str]:
     """
     Read the dataset and generate train, val and test splits.
     For GNN link prediction edges play 2 roles 1/ message passing edges 2/ supervision edges

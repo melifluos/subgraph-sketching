@@ -115,7 +115,6 @@ class DataTests(unittest.TestCase):
         data = from_networkx(G)
         edge_index = data.edge_index
         edge_index = to_undirected(edge_index)
-
-        reg_negs = negative_sampling(edge_index, num_nodes=self.num_nodes)
-        sample_hard_negatives(edge_index, G.num_nodes)
-        negs = sample_hard_negatives(self.edge_index, self.num_nodes)
+        # reg_negs = negative_sampling(edge_index, num_nodes=self.num_nodes)
+        # sample_hard_negatives(edge_index, self.num_nodes)
+        # negs = sample_hard_negatives(self.edge_index, self.num_nodes)

@@ -250,18 +250,19 @@ class BUDDY(torch.nn.Module):
                 self.sign = SIGN(num_features, args.hidden_channels, args.hidden_channels, args.sign_k,
                                  args.sign_dropout)
         self.label_lin_layer = Linear(self.dim, self.dim)
-        if args.use_feature:
+        using_node_features = self.use_feature or self.use_unbiased_feature
+        if using_node_features:
             self.bn_feats = torch.nn.BatchNorm1d(args.hidden_channels)
         if self.node_embedding is not None:
             self.bn_embs = torch.nn.BatchNorm1d(args.hidden_channels)
         self.bn_labels = torch.nn.BatchNorm1d(self.dim)
         self.bn_RA = torch.nn.BatchNorm1d(1)
 
-        if args.use_feature:
+        if using_node_features:
             self.lin_feat = Linear(num_features,
                                    args.hidden_channels)
             self.lin_out = Linear(args.hidden_channels, args.hidden_channels)
-        hidden_channels = self.dim + args.hidden_channels if self.use_feature else self.dim
+        hidden_channels = self.dim + args.hidden_channels if using_node_features else self.dim
         if self.node_embedding is not None:
             self.lin_emb = Linear(args.hidden_channels,
                                   args.hidden_channels)
@@ -294,23 +295,26 @@ class BUDDY(torch.nn.Module):
         normed_x[torch.isinf(normed_x)] = 0
         return torch.cat([x, normed_x], dim=1)
 
-    def feature_forward(self, x):
+    def feature_forward(self, x, biased=True):
         """
-        small neural network applied edgewise to hadamard product of node features
-        @param x: node features torch tensor [batch_size, 2, hidden_dim]
+        small neural network applied edgewise to (optionally) the hadamard product of node features
+        @param x: node features torch tensor [batch_size, 2, hidden_dim] or [batch_size, hidden_dim]
         @return: torch tensor [batch_size, hidden_dim]
         """
         if self.sign_k != 0:
-            x = self.sign(x)
+            # handles the concatenated multi-hop sign features
+            x = self.sign(x, biased)
         else:
             x = self.lin_feat(x)
-        x = x[:, 0, :] * x[:, 1, :]
+        if biased:  # unbiased features are calculated edgewise in preprocessing
+            x = x[:, 0, :] * x[:, 1, :]
         # mlp at the end
         x = self.lin_out(x)
         x = self.bn_feats(x)
         x = F.relu(x)
         x = F.dropout(x, p=self.feature_dropout, training=self.training)
         return x
+
 
     def embedding_forward(self, x):
         x = self.lin_emb(x)
@@ -341,9 +345,9 @@ class BUDDY(torch.nn.Module):
         x = F.relu(x)
         x = F.dropout(x, p=self.label_dropout, training=self.training)
         if self.use_unbiased_feature:
-            # todo: need to pass this through an equivalent of the feature_forward function
-            x = torch.cat([x, unbiased_features.to(torch.float)], 1)
-        if self.use_feature:
+            node_features = self.feature_forward(unbiased_features, biased=False)
+            x = torch.cat([x, node_features.to(torch.float)], 1)
+        elif self.use_feature:
             node_features = self.feature_forward(node_features)
             x = torch.cat([x, node_features.to(torch.float)], 1)
         if self.node_embedding is not None:
