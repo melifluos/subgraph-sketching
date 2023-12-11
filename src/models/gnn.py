@@ -170,7 +170,7 @@ class SIGN(SIGNBaseClass):
     def __init__(self, in_channels, hidden_channels, out_channels, K, dropout):
         super(SIGN, self).__init__(in_channels, hidden_channels, out_channels, K, dropout)
 
-    def forward(self, xs):
+    def forward(self, xs, biased=True):
         """
         apply the sign feature transform where each component of the polynomial A^n x is treated independently
         @param xs: [batch_size, 2, n_features * (K + 1)]
@@ -181,8 +181,11 @@ class SIGN(SIGNBaseClass):
         # split features into k+1 chunks and put each tensor in a list
         for lin, bn, x in zip(self.lins, self.bns, xs):
             h = lin(x)
-            # the next line is a fuggly way to apply the same batch norm to both source and destination edges
-            h = torch.cat((bn(h[:, 0, :]).unsqueeze(1), bn(h[:, 1, :]).unsqueeze(1)), dim=1)
+            if biased:
+                # the next line is a fuggly way to apply the same batch norm to both source and destination edges
+                h = torch.cat((bn(h[:, 0, :]).unsqueeze(1), bn(h[:, 1, :]).unsqueeze(1)), dim=1)
+            else:
+                h = bn(h)
             h = F.relu(h)
             h = F.dropout(h, p=self.dropout, training=self.training)
             hs.append(h)

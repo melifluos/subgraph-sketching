@@ -24,7 +24,7 @@ def get_train_func(args):
     return train_func
 
 
-def train_buddy(model, optimizer, train_loader, args, device, emb=None):
+def train_buddy(model, optimizer, train_loader: DataLoader, args, device: torch.device, emb: torch.Tensor=None) -> float:
     print('starting training')
     t0 = time.time()
     model.train()

@@ -15,6 +15,7 @@ from src.datasets.elph import HashDataset, make_train_eval_data
 from test_params import OPT
 from src.utils import ROOT_DIR
 from src.hashing import ElphHashes
+from src.models.elph import BUDDY
 
 
 class ELPHDatasetTests(unittest.TestCase):
@@ -93,20 +94,33 @@ class ELPHDatasetTests(unittest.TestCase):
         self.assertTrue(torch.all(torch.eq(subgraph_features, sf2)))
 
     def test_preprocess_features(self):
-        pass
+        root = f'{ROOT_DIR}/test/dataset/test_preprocess_features'
+        self.args.sign_k = 1
+        split = 'train'
+        ei, ew = self.edge_index, self.edge_weight
+        data = Data(self.x, ei)
+        hdd = HashDataset(root, split, data, self.pos_edges, self.neg_edges, self.args, use_coalesce=False,
+                            directed=False)
+        feature_name = f'{root}_{split}_k{self.args.sign_k}_featurecache.pt'
+        if os.path.exists(feature_name): os.remove(feature_name)
+        x = hdd._preprocess_node_features(data, ei, ew, verbose=True)
+        self.assertTrue(x.shape == (len(hdd.links), self.n_features * (self.args.sign_k + 1)))
+        model = BUDDY(self.args, hdd.num_features, node_embedding=None)
 
 
     def test_get_unbiased_features(self):
-        root = f'{ROOT_DIR}/test/dataset/test_HashedDynamicDataset'
+        root = f'{ROOT_DIR}/test/dataset/test_get_unbiased_features'
         split = 'train'
-        feature_name = f'{root}_{split}_k{self.args.sign_k}_unbiased_feature_cache.pt'
+        unbiased_feature_name = f'{root}_{split}_k{self.args.sign_k}_unbiased_feature_cache.pt'
+        feature_name = f'{root}_{split}_k{self.args.sign_k}_featurecache.pt'
+        if os.path.exists(unbiased_feature_name): os.remove(unbiased_feature_name)
         if os.path.exists(feature_name): os.remove(feature_name)
         ei = self.edge_index
         data = Data(self.x, ei)
         hdd = HashDataset(root, split, data, self.pos_edges, self.neg_edges, self.args, use_coalesce=False,
                           directed=False, load_features=True, use_unbiased_feature=True)
         unbiased_features = hdd._preprocess_unbiased_node_features(hdd, ei, self.edge_weight)
-        os.remove(feature_name)
+        os.remove(unbiased_feature_name)
         self.assertTrue(unbiased_features.shape == (len(hdd.links), self.n_features * (self.args.sign_k + 1)))
         self.assertTrue(unbiased_features.shape[0] == len(self.pos_edges) + len(self.neg_edges))
 
@@ -124,9 +138,10 @@ class ELPHDatasetTests(unittest.TestCase):
         self.assertTrue(ubf.shape == (len(hdd.links), self.n_features * (self.args.sign_k + 1)))
         self.assertTrue(ubf.shape[0] == len(self.pos_edges) + len(self.neg_edges))
         # clean up
-        os.remove(feature_name)
         new_feature_name = f'{root}_{split}_k{self.args.sign_k}_unbiased_feature_cache.pt'
         os.remove(new_feature_name)
+        if os.path.exists(unbiased_feature_name): os.remove(unbiased_feature_name)
+        if os.path.exists(feature_name): os.remove(feature_name)
 
 
 
