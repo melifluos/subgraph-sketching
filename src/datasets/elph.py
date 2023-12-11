@@ -7,6 +7,7 @@ from time import time
 
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 import scipy.sparse as ssp
 import torch
 import torch_sparse
@@ -175,7 +176,7 @@ class HashDataset(Dataset):
         #  don't load features from disk as we are generating them with each positive edge omitted
         old_flag = self.load_features
         self.load_features = False
-        for edge in self.pos_edges:
+        for edge in tqdm(self.pos_edges):
             u, v = edge[0], edge[1]
             mask = ~((edge_index[0] == u) & (edge_index[1] == v) |
                      (edge_index[0] == v) & (edge_index[1] == u))
@@ -291,28 +292,6 @@ class HashDataset(Dataset):
                                                                     np.uint32),
                                                                 links[:, 1].cpu().numpy().astype(
                                                                     np.uint32))
-        # else:
-        #     #todo remove after testing grape_exact
-        #     print("USING EXACT GRAPE")
-        #     overlaps, lefts, rights = [], [], []
-        #     for (src, dst) in tqdm(links):
-        #         overlap, left, right = graph.get_exact_edge_sketching_from_edge_node_ids(
-        #             src=src,
-        #             dst=dst,
-        #             include_selfloops=True,
-        #             number_of_hops=self.max_hash_hops,
-        #             remove_edge_bias=self.remove_edge_bias,
-        #         )
-        #         overlaps.append(overlap)
-        #         lefts.append(left)
-        #         rights.append(right)
-        #     edge_df = {"overlap": np.stack(overlaps).astype(np.float32),
-        #                "left_difference": np.vstack(lefts).astype(np.float32),
-        #                "right_difference": np.vstack(rights).astype(np.float32)}
-
-        # overlap = torch.tensor(edge_df["overlap"].reshape(edge_df["overlap"].shape[0], -1))
-        # left = torch.tensor(edge_df["left_difference"].reshape(edge_df["left_difference"].shape[0], -1))
-        # right = torch.tensor(edge_df["right_difference"].reshape(edge_df["right_difference"].shape[0], -1))
 
         return torch.tensor(edge_df['edge_features'])
 
@@ -329,14 +308,7 @@ class HashDataset(Dataset):
             print(f'no subgraph features found at {subgraph_cache_name}. Generating subgraph features')
             start_time = time()
             if self.use_grape:
-                # use grape Tensor[n_edges, max_hops(max_hops+2)]
-                # overlap, left, right = self.construct_grape_features(num_nodes, self.links)
                 self.subgraph_features = self.construct_grape_features(num_nodes, self.links)
-                # use grape Tensor[n_edges, max_hops(max_hops+2)]
-                # self.subgraph_features = torch.cat([overlap, left, right], dim=1)
-                # todo remove after testing grape_exact
-                # assert self.max_hash_hops == 2 and self.use_grape_exact == True, 'grape_exact only implemented for 2 hops'
-                # self.subgraph_features[:, [4, 6]] = 0
             else:
                 hashes, cards = self.elph_hashes.build_hash_tables(num_nodes, self.edge_index)
                 print(f'Preprocessed hashes in: {time() - start_time:.2f} seconds. Constructing subgraph features')
