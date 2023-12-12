@@ -120,13 +120,18 @@ def get_buddy_preds(model, loader, device, args, split=None):
             subgraph_features = data.subgraph_features[indices].to(device)
         else:
             subgraph_features = torch.zeros(data.subgraph_features[indices].shape).to(device)
+        if args.use_unbiased_feature:
+            # for test-val eval the unbiased features are not cached as the regular features are unbiased
+            unbiased_features = data.unbiased_features[indices].to(device)
+        else:
+            unbiased_features = None
         node_features = data.x[curr_links].to(device)
         degrees = data.degrees[curr_links].to(device)
         if args.use_RA:
             RA = data.RA[indices].to(device)
         else:
             RA = None
-        logits = model(subgraph_features, node_features, degrees[:, 0], degrees[:, 1], RA, batch_emb)
+        logits = model(subgraph_features, node_features, degrees[:, 0], degrees[:, 1], RA, batch_emb, unbiased_features)
         preds.append(logits.view(-1).cpu())
         if (batch_count + 1) * args.eval_batch_size > n_samples:
             break

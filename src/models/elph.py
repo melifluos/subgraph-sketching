@@ -315,24 +315,6 @@ class BUDDY(torch.nn.Module):
         x = F.dropout(x, p=self.feature_dropout, training=self.training)
         return x
 
-    def unbiased_feature_forward(self, x):
-        """
-        small neural network applied edgewise to hadamard product of node features
-        @param x: node features torch tensor [batch_size, hidden_dim]
-        @return: torch tensor [batch_size, hidden_dim]
-        """
-        if self.sign_k != 0:
-            x = self.sign(x)
-        else:
-            x = self.lin_feat(x)
-        x = x[:, 0, :] * x[:, 1, :]
-        # mlp at the end
-        x = self.lin_out(x)
-        x = self.bn_feats(x)
-        x = F.relu(x)
-        x = F.dropout(x, p=self.feature_dropout, training=self.training)
-        return x
-
     def embedding_forward(self, x):
         x = self.lin_emb(x)
         x = x[:, 0, :] * x[:, 1, :]
