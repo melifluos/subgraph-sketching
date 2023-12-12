@@ -8,14 +8,33 @@ import os
 import torch
 from torch_geometric.data import Data
 from torch.utils.data import DataLoader
+from torch_geometric.utils import to_networkx, to_undirected
 from torch_geometric.utils.random import barabasi_albert_graph
 import scipy.sparse as ssp
+import networkx as nx
+import matplotlib.pyplot as plt
 
 from src.datasets.elph import HashDataset, make_train_eval_data
 from test_params import OPT
 from src.utils import ROOT_DIR
 from src.hashing import ElphHashes
 from src.models.elph import BUDDY
+
+
+def find_critical_edges(graph):
+    critical_edges = []
+    total_comps = nx.number_connected_components(graph)
+    for edge in graph.edges():
+        # Remove the edge and check the number of connected components
+        graph.remove_edge(*edge)
+        num_components = nx.number_connected_components(graph)
+        graph.add_edge(*edge)  # Add the edge back
+
+        # If the number of components increases, the edge is critical
+        if num_components > total_comps:
+            critical_edges.append(edge)
+
+    return critical_edges
 
 
 class ELPHDatasetTests(unittest.TestCase):
@@ -100,13 +119,46 @@ class ELPHDatasetTests(unittest.TestCase):
         ei, ew = self.edge_index, self.edge_weight
         data = Data(self.x, ei)
         hdd = HashDataset(root, split, data, self.pos_edges, self.neg_edges, self.args, use_coalesce=False,
-                            directed=False)
+                          directed=False)
         feature_name = f'{root}_{split}_k{self.args.sign_k}_featurecache.pt'
         if os.path.exists(feature_name): os.remove(feature_name)
         x = hdd._preprocess_node_features(data, ei, ew, verbose=True)
         self.assertTrue(x.shape == (len(hdd.links), self.n_features * (self.args.sign_k + 1)))
-        model = BUDDY(self.args, hdd.num_features, node_embedding=None)
 
+    def test_crop_bridge_edges(self):
+        root = f'{ROOT_DIR}/test/dataset/test_crop_bridge_edges'
+        split = 'train'
+        unbiased_feature_name = f'{root}_{split}_k{self.args.sign_k}_unbiased_feature_cache.pt'
+        feature_name = f'{root}_{split}_k{self.args.sign_k}_featurecache.pt'
+        if os.path.exists(unbiased_feature_name): os.remove(unbiased_feature_name)
+        if os.path.exists(feature_name): os.remove(feature_name)
+        self.args.use_unbiased_feature = True
+        # make a graph with some bridges
+        degree = 5
+        nodes = 10
+        components = 4
+        edge_index = []
+        for comp in range(components):
+            ei = barabasi_albert_graph(nodes, degree)
+            ei += comp * nodes
+            # bridge between last node in this cc and first node in next cc
+            bridge = (comp * nodes + nodes - 1, (comp + 1) * nodes)
+            ei = torch.cat([ei, torch.tensor(bridge).unsqueeze(-1)], 1)
+            edge_index.append(ei)
+        n_nodes = nodes * components + 1
+        x = torch.rand((n_nodes, self.n_features))
+        edge_index = to_undirected(torch.cat(edge_index, -1))
+        data = Data(x, edge_index)
+        networkx_graph = to_networkx(data, to_undirected=True)
+        pos = nx.spring_layout(networkx_graph)  # Define a layout for the graph
+        nx.draw(networkx_graph, pos, with_labels=True, font_weight='bold', node_size=100, node_color='skyblue',
+                font_color='black', font_size=10, edge_color='gray')
+        plt.show()
+        bridges = find_critical_edges(networkx_graph)
+        neg_edges = torch.randint(nodes * components, (10, 2))
+        hdd = HashDataset(root, split, data, self.edge_index.T, neg_edges, self.args, use_coalesce=False,
+                          directed=False)
+        self.assertTrue(len(hdd.links) == len(self.edge_index.T) - len(bridges))
 
     def test_get_unbiased_features(self):
         root = f'{ROOT_DIR}/test/dataset/test_get_unbiased_features'
@@ -142,9 +194,6 @@ class ELPHDatasetTests(unittest.TestCase):
         os.remove(new_feature_name)
         if os.path.exists(unbiased_feature_name): os.remove(unbiased_feature_name)
         if os.path.exists(feature_name): os.remove(feature_name)
-
-
-
 
     def test_read_subgraph_features(self):
         pass

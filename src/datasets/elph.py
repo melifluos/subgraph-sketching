@@ -4,18 +4,19 @@ constructing the hashed data objects used by elph and buddy
 
 import os
 from time import time
+
+import networkx as nx
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
-
 import scipy.sparse as ssp
 import torch
 import torch_sparse
 from embiggen.embedders.ensmallen_embedders.hyper_sketching import HyperSketching
 from grape import Graph
-from torch_geometric.data import Dataset
+from torch_geometric.data import Dataset, Data
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
-from torch_geometric.utils import to_undirected
+from torch_geometric.utils import to_networkx, to_undirected
 from torch_sparse import coalesce
 
 from src.hashing import ElphHashes
@@ -90,12 +91,10 @@ class HashDataset(Dataset):
         if args.model == 'ELPH':  # features propagated in the model instead of preprocessed
             self.x = data.x
         else:
+            self._preprocess_subgraph_features(self.edge_index.device, data.num_nodes, args.num_negs)
+
             # node features are used to calculate both biased and unbiased features
             self.x = self._preprocess_node_features(data, self.edge_index, self.edge_weight)
-
-            # ELPH does hashing and feature prop on the fly
-            # either set self.hashes or self.subgraph_features depending on cmd args
-            self._preprocess_subgraph_features(self.edge_index.device, data.num_nodes, args.num_negs)
             if self.use_unbiased_feature:
                 self.unbiased_features = self._preprocess_unbiased_node_features(data, self.edge_index,
                                                                                  self.edge_weight)
@@ -110,15 +109,16 @@ class HashDataset(Dataset):
         if self.split == 'train' and self.use_unbiased_feature:
             print('removing bridge edges from training set')
             # I need a mask that keeps all negative edges and positive edges that are not bridges
-            pos_mask = ~(self.subgraph_features[:len(self.pos_edges)] == 0).all(dim=-1)
+            pos_mask = (self.subgraph_features[:len(self.pos_edges)] == 0).all(dim=-1)
+            print(f'removing {sum(pos_mask)} bridge edges from training set')
             neg_mask = torch.ones(len(self.neg_edges), dtype=torch.bool)
-            mask = torch.cat([pos_mask, neg_mask], dim=0)
-            self.labels = self.labels[mask]
+            mask = torch.cat([~pos_mask, neg_mask], dim=0)
+            self.labels = list(np.array(self.labels)[mask])
             self.links = self.links[mask]
             self.subgraph_features = self.subgraph_features[mask]
             self.unbiased_features = self.unbiased_features[mask]
-
-
+            if self.use_RA:
+                self.RA = self.RA[mask]
 
     def _generate_sign_features(self, data, edge_index: torch.Tensor, edge_weight: torch.Tensor,
                                 sign_k: int) -> torch.Tensor:
@@ -217,7 +217,10 @@ class HashDataset(Dataset):
         #  don't load features from disk as we are generating them with each positive edge omitted
         old_flag = self.load_features
         self.load_features = False
-        for edge in tqdm(self.pos_edges):
+        nxgraph = to_networkx(Data(edge_index=edge_index), to_undirected=True)
+        total_ccs = nx.number_connected_components(nxgraph)
+        bridge_indices = []
+        for idx, edge in tqdm(enumerate(self.pos_edges)):
             # todo: need to remove bridge edges
             # filtered_graph = graph.filter_from_ids(
             #         edge_node_ids_to_remove=[(src, dst), (dst, src)]
@@ -230,6 +233,10 @@ class HashDataset(Dataset):
             # be removed once and not twice causing the assertion below to fail
             assert torch.sum(mask) == edge_index.shape[1] - 2, ('either the pos edges are not in the edge index or '
                                                                 'the edge index contains duplicates')
+            nx_subgraph = to_networkx(Data(edge_index=edge_index[:, mask]), to_undirected=True)
+            ccs = nx.number_connected_components(nx_subgraph)
+            if ccs > total_ccs:
+                bridge_indices.append(idx)
             x = self._preprocess_node_features(data, edge_index[:, mask], edge_weight[mask])
             feat = x[u] * x[v]
             pos_unbiased_features.append(feat)
@@ -245,7 +252,7 @@ class HashDataset(Dataset):
             self.links), 'unbiased features are inconsistent with the link object. Delete unbiased features file and regenerate'
         self.load_features = old_flag
         torch.save(unbiased_features, feature_name)
-        return unbiased_features
+        return unbiased_features, bridge_indices
 
     def _read_subgraph_features(self, name: str, device: torch.device) -> bool:
         """
