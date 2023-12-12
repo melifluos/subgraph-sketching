@@ -92,12 +92,33 @@ class HashDataset(Dataset):
         else:
             # node features are used to calculate both biased and unbiased features
             self.x = self._preprocess_node_features(data, self.edge_index, self.edge_weight)
-            if self.use_unbiased_feature:
-                self.unbiased_features = self._preprocess_unbiased_node_features(data, self.edge_index,
-                                                                                 self.edge_weight)
+
             # ELPH does hashing and feature prop on the fly
             # either set self.hashes or self.subgraph_features depending on cmd args
             self._preprocess_subgraph_features(self.edge_index.device, data.num_nodes, args.num_negs)
+            if self.use_unbiased_feature:
+                self.unbiased_features = self._preprocess_unbiased_node_features(data, self.edge_index,
+                                                                                 self.edge_weight)
+                self.crop_bridge_edges()
+
+    def crop_bridge_edges(self) -> None:
+        """
+        Remove positive training edges that are bridges. This is necessary because the unbiased features are
+        calculated by removing the edge from the graph and propagating the node features. If the edge is a bridge
+        then the graph will be disconnected and the node features will be zero.
+        """
+        if self.split == 'train' and self.use_unbiased_feature:
+            print('removing bridge edges from training set')
+            # I need a mask that keeps all negative edges and positive edges that are not bridges
+            pos_mask = ~(self.subgraph_features[:len(self.pos_edges)] == 0).all(dim=-1)
+            neg_mask = torch.ones(len(self.neg_edges), dtype=torch.bool)
+            mask = torch.cat([pos_mask, neg_mask], dim=0)
+            self.labels = self.labels[mask]
+            self.links = self.links[mask]
+            self.subgraph_features = self.subgraph_features[mask]
+            self.unbiased_features = self.unbiased_features[mask]
+
+
 
     def _generate_sign_features(self, data, edge_index: torch.Tensor, edge_weight: torch.Tensor,
                                 sign_k: int) -> torch.Tensor:
@@ -197,6 +218,11 @@ class HashDataset(Dataset):
         old_flag = self.load_features
         self.load_features = False
         for edge in tqdm(self.pos_edges):
+            # todo: need to remove bridge edges
+            # filtered_graph = graph.filter_from_ids(
+            #         edge_node_ids_to_remove=[(src, dst), (dst, src)]
+            #     )
+            # graph.get_shortest_path_node_ids_from_node_ids(src, dst) will raise if the edges are not connected
             u, v = edge[0], edge[1]
             mask = ~((edge_index[0] == u) & (edge_index[1] == v) |
                      (edge_index[0] == v) & (edge_index[1] == u))
