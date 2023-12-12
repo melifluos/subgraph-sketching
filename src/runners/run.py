@@ -268,5 +268,5 @@ if __name__ == '__main__':
     if args.dataset_name == 'ogbl-ddi':
         args.use_feature = 0  # dataset has no features
         assert args.sign_k > 0, '--sign_k must be set to > 0 i.e. 1,2 or 3 for ogbl-ddi'
-    assert not args.use_feature and args.use_unbiased_feature
+    assert not (args.use_feature and args.use_unbiased_feature)
     run(args)

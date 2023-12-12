@@ -90,14 +90,33 @@ class HashDataset(Dataset):
         if args.model == 'ELPH':  # features propagated in the model instead of preprocessed
             self.x = data.x
         else:
+            self._preprocess_subgraph_features(self.edge_index.device, data.num_nodes, args.num_negs)
+
             # node features are used to calculate both biased and unbiased features
             self.x = self._preprocess_node_features(data, self.edge_index, self.edge_weight)
             if self.use_unbiased_feature:
                 self.unbiased_features = self._preprocess_unbiased_node_features(data, self.edge_index,
                                                                                  self.edge_weight)
-            # ELPH does hashing and feature prop on the fly
-            # either set self.hashes or self.subgraph_features depending on cmd args
-            self._preprocess_subgraph_features(self.edge_index.device, data.num_nodes, args.num_negs)
+                self.crop_bridge_edges()
+
+    def crop_bridge_edges(self) -> None:
+        """
+        Remove positive training edges that are bridges. This is necessary because the unbiased features are
+        calculated by removing the edge from the graph and propagating the node features. If the edge is a bridge
+        then the graph will be disconnected and the node features will be zero.
+        """
+        if self.split == 'train' and self.use_unbiased_feature:
+            print('removing bridge edges from training set')
+            # I need a mask that keeps all negative edges and positive edges that are not bridges
+            pos_mask = ~(self.subgraph_features[:len(self.pos_edges)] == 0).all(dim=-1)
+            neg_mask = torch.ones(len(self.neg_edges), dtype=torch.bool)
+            mask = torch.cat([pos_mask, neg_mask], dim=0)
+            self.labels = list(np.array(self.labels)[mask])
+            self.links = self.links[mask]
+            self.subgraph_features = self.subgraph_features[mask]
+            self.unbiased_features = self.unbiased_features[mask]
+            if self.use_RA:
+                self.RA = self.RA[mask]
 
     def _generate_sign_features(self, data, edge_index: torch.Tensor, edge_weight: torch.Tensor,
                                 sign_k: int) -> torch.Tensor:
@@ -366,6 +385,7 @@ class HashDataset(Dataset):
         node_features = torch.cat([self.x[src].unsqueeze(dim=0), self.x[dst].unsqueeze(dim=0)], dim=0)
         return subgraph_features, node_features, src_degree, dst_degree, RA, y
 
+
 def get_hashed_train_val_test_datasets(dataset, train_data, val_data, test_data, args, directed=False):
     root = f'{dataset.root}/elph_'
     print(f'data path: {root}')
@@ -387,6 +407,7 @@ def get_hashed_train_val_test_datasets(dataset, train_data, val_data, test_data,
     test_dataset = HashDataset(root, 'test', test_data, pos_test_edge, neg_test_edge, args,
                                use_coalesce=use_coalesce, directed=directed)
     return train_dataset, val_dataset, test_dataset
+
 
 class HashedTrainEvalDataset(Dataset):
     """
@@ -410,6 +431,7 @@ class HashedTrainEvalDataset(Dataset):
 
     def get(self, idx):
         return self.links[idx]
+
 
 def make_train_eval_data(train_dataset, num_nodes, n_pos_samples=5000, n_negs_per_pos=None):
     """
