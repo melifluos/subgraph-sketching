@@ -4,10 +4,10 @@ constructing the hashed data objects used by elph and buddy
 
 import os
 from time import time
-
+from tqdm import tqdm
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
+
 import scipy.sparse as ssp
 import torch
 import torch_sparse
@@ -32,7 +32,7 @@ class HashDataset(Dataset):
 
     def __init__(
             self, root, split, data, pos_edges, neg_edges, args, use_coalesce=False,
-            directed=False, use_unbiased_feature=False, **kwargs):
+            directed=False, **kwargs):
         if args.model != 'ELPH':  # elph stores the hashes directly in the model class for message passing
             self.elph_hashes = ElphHashes(args)  # object for hash and subgraph feature operations
         self.split = split  # string: train, valid or test
@@ -47,7 +47,7 @@ class HashDataset(Dataset):
         self.remove_edge_bias = bool(args.remove_edge_bias)
         self.normalise_grape = bool(args.normalise_grape)
         self.load_features = args.load_features
-        self.use_unbiased_feature = use_unbiased_feature
+        self.use_unbiased_feature = args.use_unbiased_feature
         self.use_zero_one = args.use_zero_one
         self.cache_subgraph_features = args.cache_subgraph_features
         self.max_hash_hops = args.max_hash_hops
@@ -155,9 +155,29 @@ class HashDataset(Dataset):
     def _preprocess_unbiased_node_features(self, data, edge_index: torch.Tensor,
                                            edge_weight: torch.tensor) -> torch.Tensor:
         """
+        If using unbiased features these are generated for each edge. This is necessary for training features
+        but not efficient for test and val features, which could be constructed on the fly from the node features
+        as x[edges]. It is done this way for code simplicity and may change if efficiency becomes important
+        @param data: pyg Data object
+        @param edge_index:
+        @param edge_weight: pyg edge index Int Tensor [edges]
+        @return: Float Tensor [num_edges, hidden_dim]
+        """
+        if self.split == 'train':
+            unbiased_features = self._preprocess_unbiased_train_features(data, edge_index, edge_weight)
+        elif self.split in {'val', 'valid', 'test'}:
+            unbiased_features = self.x[self.links[:, 0]] * self.x[self.links[:, 1]]
+        else:
+            raise NotImplementedError
+        return unbiased_features
+
+    def _preprocess_unbiased_train_features(self, data, edge_index: torch.Tensor,
+                                            edge_weight: torch.tensor) -> torch.Tensor:
+        """
         Propagating the node features at training time over all edges in the graph introduces a bias because
-        the message passing edges are the same as the supervision edges at training time. This method propagates the
-        node features one edge at a time generating features for edge ij with edge ij omitted from the graph.
+        the message passing edges are the same as the supervision edges ie. the method can propagate over the positive
+         edges that it's trying to predict, but not over the negative edges. This method addresses this problem
+        by propagating the node features one edge at a time generating features for edge ij with edge ij omitted from the graph.
         This only happens for positive features as features for negative edges can be calculated in parallel with
         matrix multiplication as they all share the same edge index.
         @param data: pyg Data object
@@ -345,7 +365,6 @@ class HashDataset(Dataset):
         node_features = torch.cat([self.x[src].unsqueeze(dim=0), self.x[dst].unsqueeze(dim=0)], dim=0)
         return subgraph_features, node_features, src_degree, dst_degree, RA, y
 
-
 def get_hashed_train_val_test_datasets(dataset, train_data, val_data, test_data, args, directed=False):
     root = f'{dataset.root}/elph_'
     print(f'data path: {root}')
@@ -359,8 +378,7 @@ def get_hashed_train_val_test_datasets(dataset, train_data, val_data, test_data,
         f'and {pos_test_edge.shape[0]} pos, {neg_test_edge.shape[0]} neg test edges for supervision')
     print('constructing training dataset object')
     train_dataset = HashDataset(root, 'train', train_data, pos_train_edge, neg_train_edge, args,
-                                use_coalesce=use_coalesce, directed=directed,
-                                use_unbiased_feature=args.use_unbiased_feature)
+                                use_coalesce=use_coalesce, directed=directed)
     print('constructing validation dataset object')
     val_dataset = HashDataset(root, 'valid', val_data, pos_val_edge, neg_val_edge, args,
                               use_coalesce=use_coalesce, directed=directed)
@@ -368,7 +386,6 @@ def get_hashed_train_val_test_datasets(dataset, train_data, val_data, test_data,
     test_dataset = HashDataset(root, 'test', test_data, pos_test_edge, neg_test_edge, args,
                                use_coalesce=use_coalesce, directed=directed)
     return train_dataset, val_dataset, test_dataset
-
 
 class HashedTrainEvalDataset(Dataset):
     """
@@ -392,7 +409,6 @@ class HashedTrainEvalDataset(Dataset):
 
     def get(self, idx):
         return self.links[idx]
-
 
 def make_train_eval_data(train_dataset, num_nodes, n_pos_samples=5000, n_negs_per_pos=None):
     """

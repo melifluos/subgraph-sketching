@@ -315,7 +315,6 @@ class BUDDY(torch.nn.Module):
         x = F.dropout(x, p=self.feature_dropout, training=self.training)
         return x
 
-
     def embedding_forward(self, x):
         x = self.lin_emb(x)
         x = x[:, 0, :] * x[:, 1, :]
