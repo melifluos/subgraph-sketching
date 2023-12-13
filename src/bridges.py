@@ -4,6 +4,7 @@ preprocssing of a graph that identifies the bridges and writes them out to file
 import os
 
 import networkx as nx
+from tqdm import tqdm
 from torch_geometric.utils import to_networkx, to_undirected
 from torch_geometric.data import Data
 import torch
@@ -22,7 +23,7 @@ def find_bridges(edge_index: torch.Tensor, root: str) -> torch.Tensor:
     graph = to_networkx(Data(edge_index=edge_index), to_undirected=True)
     bridges = []
     total_comps = nx.number_connected_components(graph)
-    for edge in graph.edges():
+    for edge in tqdm(graph.edges()):
         # Remove the edge and check the number of connected components
         graph.remove_edge(*edge)
         num_components = nx.number_connected_components(graph)

@@ -118,7 +118,6 @@ class ELPHDatasetTests(unittest.TestCase):
         if os.path.exists(feature_name): os.remove(feature_name)
         self.args.use_unbiased_feature = True
         # make a graph with some bridges
-        root = f'{ROOT_DIR}/test_crop_bridge_edges'
         nodes = 4
         components = 4
         edge_index = []
