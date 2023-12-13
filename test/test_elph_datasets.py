@@ -141,6 +141,7 @@ class ELPHDatasetTests(unittest.TestCase):
 
     def test_find_bridges(self):
         root = f'{ROOT_DIR}/test/dataset/test_find_bridges'
+        if os.path.exists(f'{root}/bridges'): os.remove(f'{root}/bridges')
         nodes = 4
         components = 4
         edge_index = []
@@ -160,8 +161,8 @@ class ELPHDatasetTests(unittest.TestCase):
         #         font_color='black', font_size=10, edge_color='gray')
         # plt.show()
         bridges = find_bridges(edge_index, root)
-        self.assertTrue(bridges.shape[0] == components)
-        self.assertTrue(torch.all(torch.eq(bridges, torch.tensor(bridge_list))))
+        self.assertTrue(bridges.shape[0] == 2 * components)  # each bridge has an edge in each direction
+        self.assertTrue(torch.all(torch.eq(bridges, to_undirected(torch.tensor(bridge_list).T).T)))
         cached_bridges = torch.load(f'{root}/bridges.pt')
         self.assertTrue(torch.all(torch.eq(bridges, cached_bridges)))
         if os.path.exists(f'{root}/bridges'): os.remove(f'{root}/bridges')

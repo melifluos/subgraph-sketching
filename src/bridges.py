@@ -3,10 +3,9 @@ preprocssing of a graph that identifies the bridges and writes them out to file
 """
 import os
 
-from tqdm import tqdm
-
 import networkx as nx
-from torch_geometric.utils import to_networkx
+from tqdm import tqdm
+from torch_geometric.utils import to_networkx, to_undirected
 from torch_geometric.data import Data
 import torch
 
@@ -33,7 +32,7 @@ def find_bridges(edge_index: torch.Tensor, root: str) -> torch.Tensor:
         # If the number of components increases, the edge is critical
         if num_components > total_comps:
             bridges.append(edge)
-    bridges = torch.tensor(bridges)  # [num_bridges, 2]
-    torch.save(bridges, f'{root}/bridges.pt')
+    undirected_bridges = to_undirected(torch.tensor(bridges).T).T  # [num_bridges * 2, 2]
+    torch.save(undirected_bridges, f'{root}/bridges.pt')
 
-    return bridges
+    return undirected_bridges
