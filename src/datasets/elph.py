@@ -99,7 +99,7 @@ class HashDataset(Dataset):
             if self.use_unbiased_feature:
                 self.unbiased_features = self._preprocess_unbiased_node_features(data, self.edge_index,
                                                                                  self.edge_weight)
-                if self.split == 'train':
+                if self.split == 'train' and self.args.remove_bridges:
                     self.crop_bridge_edges()
 
     def crop_bridge_edges(self) -> None:
