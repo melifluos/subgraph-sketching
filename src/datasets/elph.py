@@ -113,7 +113,7 @@ class HashDataset(Dataset):
         except FileNotFoundError:
             print('no bridges found. Generating bridges')
             bridges = find_bridges(self.edge_index, self.root)
-        print(f'removing {len(bridges)} bridge edges from training set')
+        print(f'removing {len(bridges) / 2} bridge edges from training set')
         # need to find the location of the bridges in the links tensor
         bridge_set = set([tuple(bridge) for bridge in bridges.tolist()])
         mask = [tuple(link) not in bridge_set for link in self.links.tolist()]
