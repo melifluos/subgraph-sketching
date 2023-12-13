@@ -4,24 +4,26 @@ constructing the hashed data objects used by elph and buddy
 
 import os
 from time import time
+
+import networkx as nx
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
-
 import scipy.sparse as ssp
 import torch
 import torch_sparse
 # from embiggen.embedders.ensmallen_embedders.hyper_sketching import HyperSketching
 # from grape import Graph
-from torch_geometric.data import Dataset
+from torch_geometric.data import Dataset, Data
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
-from torch_geometric.utils import to_undirected
+from torch_geometric.utils import to_networkx, to_undirected
 from torch_sparse import coalesce
 
 from src.hashing import ElphHashes
 from src.heuristics import RA
 from src.utils import (get_pos_neg_edges, get_same_source_negs,
                        get_src_dst_degree)
+from src.bridges import find_bridges
 
 
 class HashDataset(Dataset):
@@ -97,7 +99,8 @@ class HashDataset(Dataset):
             if self.use_unbiased_feature:
                 self.unbiased_features = self._preprocess_unbiased_node_features(data, self.edge_index,
                                                                                  self.edge_weight)
-                self.crop_bridge_edges()
+                if self.split == 'train':
+                    self.crop_bridge_edges()
 
     def crop_bridge_edges(self) -> None:
         """
@@ -105,18 +108,22 @@ class HashDataset(Dataset):
         calculated by removing the edge from the graph and propagating the node features. If the edge is a bridge
         then the graph will be disconnected and the node features will be zero.
         """
-        if self.split == 'train' and self.use_unbiased_feature:
-            print('removing bridge edges from training set')
-            # I need a mask that keeps all negative edges and positive edges that are not bridges
-            pos_mask = ~(self.subgraph_features[:len(self.pos_edges)] == 0).all(dim=-1)
-            neg_mask = torch.ones(len(self.neg_edges), dtype=torch.bool)
-            mask = torch.cat([pos_mask, neg_mask], dim=0)
-            self.labels = list(np.array(self.labels)[mask])
-            self.links = self.links[mask]
-            self.subgraph_features = self.subgraph_features[mask]
-            self.unbiased_features = self.unbiased_features[mask]
-            if self.use_RA:
-                self.RA = self.RA[mask]
+        try:
+            bridges = torch.load(f'{self.root}/bridges.pt')
+        except FileNotFoundError:
+            print('no bridges found. Generating bridges')
+            bridges = find_bridges(self.edge_index, self.root)
+        print(f'removing {len(bridges)} bridge edges from training set')
+        # need to find the location of the bridges in the links tensor
+        bridge_set = set([tuple(bridge) for bridge in bridges.tolist()])
+        mask = [tuple(link) not in bridge_set for link in self.links.tolist()]
+        mask = torch.tensor(mask)
+        self.labels = list(np.array(self.labels)[mask])
+        self.links = self.links[mask]
+        self.subgraph_features = self.subgraph_features[mask]
+        self.unbiased_features = self.unbiased_features[mask]
+        if self.use_RA:
+            self.RA = self.RA[mask]
 
     def _generate_sign_features(self, data, edge_index: torch.Tensor, edge_weight: torch.Tensor,
                                 sign_k: int) -> torch.Tensor:
@@ -215,7 +222,7 @@ class HashDataset(Dataset):
         #  don't load features from disk as we are generating them with each positive edge omitted
         old_flag = self.load_features
         self.load_features = False
-        for edge in tqdm(self.pos_edges):
+        for idx, edge in tqdm(enumerate(self.pos_edges)):
             u, v = edge[0], edge[1]
             mask = ~((edge_index[0] == u) & (edge_index[1] == v) |
                      (edge_index[0] == v) & (edge_index[1] == u))
@@ -228,7 +235,7 @@ class HashDataset(Dataset):
             pos_unbiased_features.append(feat)
         pos_unbiased_features = torch.stack(pos_unbiased_features, dim=0)
         assert pos_unbiased_features.shape[0] == self.pos_edges.shape[0], (
-            'pos unbiased features are inconsistent with '                                                                           'the link object.')
+            'pos unbiased features are inconsistent with the link object.')
         neg_node_features = self.x[self.neg_edges]
         neg_unbiased_features = neg_node_features[:, 0, :] * neg_node_features[:, 1, :]
         assert pos_unbiased_features.shape[1] == neg_unbiased_features.shape[
