@@ -4,6 +4,7 @@ Testing the subgraph sketching dataset objects
 import unittest
 from argparse import Namespace
 import os
+from copy import copy
 
 import torch
 from torch_geometric.data import Data
@@ -19,6 +20,7 @@ from test_params import OPT
 from src.utils import ROOT_DIR
 from src.hashing import ElphHashes
 from src.bridges import find_bridges
+from src.runners.run import get_data
 
 
 class ELPHDatasetTests(unittest.TestCase):
@@ -113,10 +115,12 @@ class ELPHDatasetTests(unittest.TestCase):
         root = f'{ROOT_DIR}/test/dataset/test_crop_bridge_edges'
         split = 'train'
         self.args.remove_bridges = True
+        self.args.use_unbiased_feature = True
         unbiased_feature_name = f'{root}_{split}_k{self.args.sign_k}_unbiased_feature_cache.pt'
         feature_name = f'{root}_{split}_k{self.args.sign_k}_featurecache.pt'
         if os.path.exists(unbiased_feature_name): os.remove(unbiased_feature_name)
         if os.path.exists(feature_name): os.remove(feature_name)
+        if os.path.exists(f'{root}/bridges.pt'): os.remove(f'{root}/bridges.pt')
         self.args.use_unbiased_feature = True
         # make a graph with some bridges
         nodes = 4
@@ -136,9 +140,31 @@ class ELPHDatasetTests(unittest.TestCase):
         x = torch.rand((n_nodes, self.n_features))
         data = Data(x, edge_index)
         neg_edges = torch.randint(n_nodes, (10, 2))
+        pos_edges = copy(edge_index.T)
+        hdd = HashDataset(root, split, data, pos_edges, neg_edges, self.args, use_coalesce=False,
+                          directed=False)
+        self.assertTrue(len(hdd.links) == len(edge_index.T) + len(neg_edges) - len(bridge_list) * 2)
+
+        self.args.remove_bridges = False
+        if os.path.exists(f'{root}/bridges.pt'): os.remove(f'{root}/bridges.pt')
+        # check that the mask corresponds to the bridge edges
         hdd = HashDataset(root, split, data, edge_index.T, neg_edges, self.args, use_coalesce=False,
                           directed=False)
-        self.assertTrue(len(hdd.links) == len(edge_index.T) + len(neg_edges) - len(bridge_list))
+        hdd_pos_edges = hdd.links[torch.tensor(hdd.labels) == 1]
+        bridges = find_bridges(hdd_pos_edges.T, root)
+        self.assertTrue(bridges.shape[0] == 2 * components)  # each bridge has an edge in each direction
+        self.assertTrue(torch.all(torch.eq(bridges, to_undirected(torch.tensor(bridge_list).T).T)))
+        mask = hdd.get_bridge_edge_mask(bridges, hdd.links)
+        self.assertTrue(sum(mask) == len(hdd.links) - 2 * components)
+        sgf = hdd.subgraph_features
+        # plot to show that the bridge edges are indeed removed
+        new_pos_links = hdd.links[torch.tensor(hdd.labels) == 1]
+        networkx_graph = to_networkx(Data(edge_index=new_pos_links.T), to_undirected=True)
+        pos = nx.spring_layout(networkx_graph)  # Define a layout for the graph
+        nx.draw(networkx_graph, pos, with_labels=True, font_weight='bold', node_size=100, node_color='skyblue',
+                font_color='black', font_size=10, edge_color='gray')
+        plt.show()
+        if os.path.exists(f'{root}/bridges.pt'): os.remove(f'{root}/bridges.pt')
 
     def test_find_bridges(self):
         root = f'{ROOT_DIR}/test/dataset/test_find_bridges'
@@ -167,6 +193,9 @@ class ELPHDatasetTests(unittest.TestCase):
         cached_bridges = torch.load(f'{root}/bridges.pt')
         self.assertTrue(torch.all(torch.eq(bridges, cached_bridges)))
         if os.path.exists(f'{root}/bridges'): os.remove(f'{root}/bridges')
+        # run on Cora
+        # dataset, splits, directed, eval_metric = get_data(self.args)
+        # bridges = find_bridges(dataset[0].edge_index, root)
 
     def test_get_unbiased_features(self):
         root = f'{ROOT_DIR}/test/dataset/test_get_unbiased_features'

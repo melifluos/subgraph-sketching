@@ -14,7 +14,7 @@ from src.utils import ROOT_DIR
 def find_bridges(edge_index: torch.Tensor, root: str) -> torch.Tensor:
     """
     Find the bridges in a graph and write them out to file
-    @param edge_index:
+    @param edge_index: [2, num_edges]
     @param root: This is the root dir for the dataset e.g 'dataset/Cora
     @return:
     """
