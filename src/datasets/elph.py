@@ -49,7 +49,7 @@ class HashDataset(Dataset):
         self.remove_edge_bias = bool(args.remove_edge_bias)
         self.normalise_grape = bool(args.normalise_grape)
         self.load_features = args.load_features
-        self.use_unbiased_feature = args.use_unbiased_feature
+        self.use_unbiased_feature = bool(args.use_unbiased_feature)
         self.use_zero_one = args.use_zero_one
         self.cache_subgraph_features = args.cache_subgraph_features
         self.max_hash_hops = args.max_hash_hops
@@ -99,8 +99,33 @@ class HashDataset(Dataset):
             if self.use_unbiased_feature:
                 self.unbiased_features = self._preprocess_unbiased_node_features(data, self.edge_index,
                                                                                  self.edge_weight)
-                if self.split == 'train':
-                    self.crop_bridge_edges()
+            if self.split == 'train' and self.args.remove_bridges:
+                self.crop_bridge_edges()
+            else:
+                print('not cropping bridge edges')
+
+    def get_bridge_edge_mask(self, bridges, links):
+        """
+        get a mask of the links that are not bridges
+        @param bridges: Tensor [n_bridges, 2] of bridge edges
+        @param links: Tensor [n_edges, 2] of edges
+        @return: Tensor [n_edges] of bools
+        """
+        bridge_set = set([tuple(bridge) for bridge in bridges.tolist()])
+        mask = [tuple(link) not in bridge_set for link in links.tolist()]
+        mask = torch.tensor(mask)
+        return mask
+
+    def get_bridge_mask_from_subgraph_features(self):
+        """
+        get a list of bridge edges from the subgraph features
+        @return: Tensor [n_bridges, 2] of bridge edges
+        """
+        intersections = self.subgraph_features[:, :self.max_hash_hops ** 2]
+        not_bridges = (intersections > 0).any(1)
+        mask = not_bridges or ~torch.tensor(self.labels)
+        return mask
+
 
     def crop_bridge_edges(self) -> None:
         """
@@ -108,16 +133,19 @@ class HashDataset(Dataset):
         calculated by removing the edge from the graph and propagating the node features. If the edge is a bridge
         then the graph will be disconnected and the node features will be zero.
         """
-        try:
-            bridges = torch.load(f'{self.root}/bridges.pt')
-        except FileNotFoundError:
-            print('no bridges found. Generating bridges')
-            bridges = find_bridges(self.edge_index, self.root)
-        print(f'removing {len(bridges) / 2} bridge edges from training set')
-        # need to find the location of the bridges in the links tensor
-        bridge_set = set([tuple(bridge) for bridge in bridges.tolist()])
-        mask = [tuple(link) not in bridge_set for link in self.links.tolist()]
-        mask = torch.tensor(mask)
+        if True:
+            mask = self.get_bridge_mask_from_subgraph_features()
+            n_bridges = len(self.links) - mask.sum()
+            print(f'found and removing {n_bridges / 2} bridge edges from training set using subgraph features')
+        else:
+            try:
+                bridges = torch.load(f'{self.root}/bridges.pt')
+            except FileNotFoundError:
+                print('no bridges found. Generating bridges')
+                bridges = find_bridges(self.edge_index, self.root)
+            print(f'removing {len(bridges) / 2} bridge edges from training set')
+            # need to find the location of the bridges in the links tensor
+            mask = self.get_bridge_edge_mask(bridges, self.links)
         self.labels = list(np.array(self.labels)[mask])
         self.links = self.links[mask]
         self.subgraph_features = self.subgraph_features[mask]

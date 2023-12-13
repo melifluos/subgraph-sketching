@@ -242,6 +242,8 @@ if __name__ == '__main__':
     parser.add_argument('--normalise_grape', type=str2bool, default=0, help='normalise the grape features')
     parser.add_argument('--self_loops', type=str2bool, default=1,
                         help='use self loops when calculating subgraph features')
+    parser.add_argument('--remove_bridges', type=str2bool, default=0,
+                        help='remove bridges from supervision edges at training time when using unbiased features')
     # wandb settings
     parser.add_argument('--wandb', action='store_true', help="flag if logging to wandb")
     parser.add_argument('--wandb_offline', dest='use_wandb_offline',
