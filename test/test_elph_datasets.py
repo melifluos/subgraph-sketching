@@ -19,7 +19,7 @@ from test_params import OPT
 from src.utils import ROOT_DIR
 from src.hashing import ElphHashes
 from src.bridges import find_bridges
-
+from src.runners.run import get_data
 
 class ELPHDatasetTests(unittest.TestCase):
     def setUp(self):
@@ -166,6 +166,9 @@ class ELPHDatasetTests(unittest.TestCase):
         cached_bridges = torch.load(f'{root}/bridges.pt')
         self.assertTrue(torch.all(torch.eq(bridges, cached_bridges)))
         if os.path.exists(f'{root}/bridges'): os.remove(f'{root}/bridges')
+        # run on Cora
+        # dataset, splits, directed, eval_metric = get_data(self.args)
+        # bridges = find_bridges(dataset[0].edge_index, root)
 
     def test_get_unbiased_features(self):
         root = f'{ROOT_DIR}/test/dataset/test_get_unbiased_features'
