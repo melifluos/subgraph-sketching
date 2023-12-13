@@ -49,7 +49,7 @@ class HashDataset(Dataset):
         self.remove_edge_bias = bool(args.remove_edge_bias)
         self.normalise_grape = bool(args.normalise_grape)
         self.load_features = args.load_features
-        self.use_unbiased_feature = args.use_unbiased_feature
+        self.use_unbiased_feature = bool(args.use_unbiased_feature)
         self.use_zero_one = args.use_zero_one
         self.cache_subgraph_features = args.cache_subgraph_features
         self.max_hash_hops = args.max_hash_hops
@@ -99,8 +99,10 @@ class HashDataset(Dataset):
             if self.use_unbiased_feature:
                 self.unbiased_features = self._preprocess_unbiased_node_features(data, self.edge_index,
                                                                                  self.edge_weight)
-                if self.split == 'train' and self.args.remove_bridges:
-                    self.crop_bridge_edges()
+            if self.split == 'train' and self.args.remove_bridges:
+                self.crop_bridge_edges()
+            else:
+                print('not cropping bridge edges')
 
     def crop_bridge_edges(self) -> None:
         """
@@ -120,8 +122,10 @@ class HashDataset(Dataset):
         mask = torch.tensor(mask)
         self.labels = list(np.array(self.labels)[mask])
         self.links = self.links[mask]
-        self.subgraph_features = self.subgraph_features[mask]
-        self.unbiased_features = self.unbiased_features[mask]
+        if self.subgraph_features is not None:
+            self.subgraph_features = self.subgraph_features[mask]
+        if self.use_unbiased_feature:
+            self.unbiased_features = self.unbiased_features[mask]
         if self.use_RA:
             self.RA = self.RA[mask]
 

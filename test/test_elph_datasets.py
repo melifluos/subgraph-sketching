@@ -112,6 +112,7 @@ class ELPHDatasetTests(unittest.TestCase):
     def test_crop_bridge_edges(self):
         root = f'{ROOT_DIR}/test/dataset/test_crop_bridge_edges'
         split = 'train'
+        self.args.remove_bridges = True
         unbiased_feature_name = f'{root}_{split}_k{self.args.sign_k}_unbiased_feature_cache.pt'
         feature_name = f'{root}_{split}_k{self.args.sign_k}_featurecache.pt'
         if os.path.exists(unbiased_feature_name): os.remove(unbiased_feature_name)
