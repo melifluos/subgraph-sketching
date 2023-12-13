@@ -8,7 +8,7 @@ import os
 import torch
 from torch_geometric.data import Data
 from torch.utils.data import DataLoader
-from torch_geometric.utils import to_networkx, to_undirected
+from torch_geometric.utils import to_networkx, to_undirected, from_networkx
 from torch_geometric.utils.random import barabasi_albert_graph
 import scipy.sparse as ssp
 import networkx as nx
@@ -18,23 +18,7 @@ from src.datasets.elph import HashDataset, make_train_eval_data
 from test_params import OPT
 from src.utils import ROOT_DIR
 from src.hashing import ElphHashes
-from src.models.elph import BUDDY
-
-
-def find_critical_edges(graph):
-    critical_edges = []
-    total_comps = nx.number_connected_components(graph)
-    for edge in graph.edges():
-        # Remove the edge and check the number of connected components
-        graph.remove_edge(*edge)
-        num_components = nx.number_connected_components(graph)
-        graph.add_edge(*edge)  # Add the edge back
-
-        # If the number of components increases, the edge is critical
-        if num_components > total_comps:
-            critical_edges.append(edge)
-
-    return critical_edges
+from src.bridges import find_bridges
 
 
 class ELPHDatasetTests(unittest.TestCase):
@@ -134,31 +118,53 @@ class ELPHDatasetTests(unittest.TestCase):
         if os.path.exists(feature_name): os.remove(feature_name)
         self.args.use_unbiased_feature = True
         # make a graph with some bridges
-        degree = 5
-        nodes = 10
+        nodes = 4
         components = 4
         edge_index = []
+        bridge_list = []
         for comp in range(components):
-            ei = barabasi_albert_graph(nodes, degree)
+            ei = from_networkx(nx.complete_graph(nodes)).edge_index  # (2, n_edges)
             ei += comp * nodes
             # bridge between last node in this cc and first node in next cc
             bridge = (comp * nodes + nodes - 1, (comp + 1) * nodes)
+            bridge_list.append(bridge)
             ei = torch.cat([ei, torch.tensor(bridge).unsqueeze(-1)], 1)
             edge_index.append(ei)
-        n_nodes = nodes * components + 1
-        x = torch.rand((n_nodes, self.n_features))
+        n_nodes = components * nodes + 1
         edge_index = to_undirected(torch.cat(edge_index, -1))
+        x = torch.rand((n_nodes, self.n_features))
         data = Data(x, edge_index)
-        networkx_graph = to_networkx(data, to_undirected=True)
-        pos = nx.spring_layout(networkx_graph)  # Define a layout for the graph
-        nx.draw(networkx_graph, pos, with_labels=True, font_weight='bold', node_size=100, node_color='skyblue',
-                font_color='black', font_size=10, edge_color='gray')
-        plt.show()
-        bridges = find_critical_edges(networkx_graph)
-        neg_edges = torch.randint(nodes * components, (10, 2))
-        hdd = HashDataset(root, split, data, self.edge_index.T, neg_edges, self.args, use_coalesce=False,
+        neg_edges = torch.randint(n_nodes, (10, 2))
+        hdd = HashDataset(root, split, data, edge_index.T, neg_edges, self.args, use_coalesce=False,
                           directed=False)
-        self.assertTrue(len(hdd.links) == len(self.edge_index.T) - len(bridges))
+        self.assertTrue(len(hdd.links) == len(edge_index.T) + len(neg_edges) - len(bridge_list))
+
+    def test_find_bridges(self):
+        root = f'{ROOT_DIR}/test/dataset/test_find_bridges'
+        nodes = 4
+        components = 4
+        edge_index = []
+        bridge_list = []
+        for comp in range(components):
+            ei = from_networkx(nx.complete_graph(nodes)).edge_index  # (2, n_edges)
+            ei += comp * nodes
+            # bridge between last node in this cc and first node in next cc
+            bridge = (comp * nodes + nodes - 1, (comp + 1) * nodes)
+            bridge_list.append(bridge)
+            ei = torch.cat([ei, torch.tensor(bridge).unsqueeze(-1)], 1)
+            edge_index.append(ei)
+        edge_index = to_undirected(torch.cat(edge_index, -1))
+        # networkx_graph = to_networkx(Data(edge_index=edge_index), to_undirected=True)
+        # pos = nx.spring_layout(networkx_graph)  # Define a layout for the graph
+        # nx.draw(networkx_graph, pos, with_labels=True, font_weight='bold', node_size=100, node_color='skyblue',
+        #         font_color='black', font_size=10, edge_color='gray')
+        # plt.show()
+        bridges = find_bridges(edge_index, root)
+        self.assertTrue(bridges.shape[0] == components)
+        self.assertTrue(torch.all(torch.eq(bridges, torch.tensor(bridge_list))))
+        cached_bridges = torch.load(f'{root}/bridges.pt')
+        self.assertTrue(torch.all(torch.eq(bridges, cached_bridges)))
+        if os.path.exists(f'{root}/bridges'): os.remove(f'{root}/bridges')
 
     def test_get_unbiased_features(self):
         root = f'{ROOT_DIR}/test/dataset/test_get_unbiased_features'
