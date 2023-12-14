@@ -92,6 +92,7 @@ class HashDataset(Dataset):
         if args.model == 'ELPH':  # features propagated in the model instead of preprocessed
             self.x = data.x
         else:
+            # todo: should only compute this if self.args.use_struct_feature, but this breaks the code
             self._preprocess_subgraph_features(self.edge_index.device, data.num_nodes, args.num_negs)
 
             # node features are used to calculate both biased and unbiased features
@@ -100,9 +101,9 @@ class HashDataset(Dataset):
                 self.unbiased_features = self._preprocess_unbiased_node_features(data, self.edge_index,
                                                                                  self.edge_weight)
             if self.split == 'train' and self.args.remove_bridges:
-                self.crop_bridge_edges()
+                self.remove_bridges()
             else:
-                print('not cropping bridge edges')
+                print(f'not cropping bridge edges for {self.split} split')
 
     def get_bridge_edge_mask(self, bridges, links):
         """
@@ -122,12 +123,12 @@ class HashDataset(Dataset):
         @return: Tensor [n_bridges, 2] of bridge edges
         """
         intersections = self.subgraph_features[:, :self.max_hash_hops ** 2]
-        not_bridges = (intersections > 0).any(1)
-        mask = not_bridges or ~torch.tensor(self.labels)
-        return mask
+        bridges = torch.all(intersections == 0, dim=1)
+        # keep everything that is not a bridge or is a negative edge
+        keep_mask = ~bridges | ~torch.tensor(self.labels, dtype=torch.bool)
+        return keep_mask
 
-
-    def crop_bridge_edges(self) -> None:
+    def remove_bridges(self) -> None:
         """
         Remove positive training edges that are bridges. This is necessary because the unbiased features are
         calculated by removing the edge from the graph and propagating the node features. If the edge is a bridge
@@ -135,6 +136,9 @@ class HashDataset(Dataset):
         """
         if True:
             mask = self.get_bridge_mask_from_subgraph_features()
+            torch.save(mask, f'{self.root}/bridge_mask.pt')
+            bridges = find_bridges(self.edge_index, self.root)
+            torch.save(self.subgraph_features, f'{self.root}/subgraph_features.pt')
             n_bridges = len(self.links) - mask.sum()
             print(f'found and removing {n_bridges / 2} bridge edges from training set using subgraph features')
         else:
@@ -148,8 +152,10 @@ class HashDataset(Dataset):
             mask = self.get_bridge_edge_mask(bridges, self.links)
         self.labels = list(np.array(self.labels)[mask])
         self.links = self.links[mask]
-        self.subgraph_features = self.subgraph_features[mask]
-        self.unbiased_features = self.unbiased_features[mask]
+        if self.subgraph_features is not None:
+            self.subgraph_features = self.subgraph_features[mask]
+        if self.use_unbiased_feature:
+            self.unbiased_features = self.unbiased_features[mask]
         if self.use_RA:
             self.RA = self.RA[mask]
 
@@ -193,7 +199,8 @@ class HashDataset(Dataset):
         else:
             feature_name = f'{self.root}_{self.split}_k{sk}_featurecache.pt'
         if self.load_features and os.path.exists(feature_name):
-            print('loading node features from disk')
+            print(f'loading node features from {feature_name}. WARNING: for Cora, Citeseer and Pubmed '
+                  f'the edges are randomly sampled and so cached features are leaking information')
             x = torch.load(feature_name).to(edge_index.device)
         else:
             if verbose:
@@ -241,11 +248,15 @@ class HashDataset(Dataset):
         """
         feature_name = f'{self.root}_{self.split}_k{self.args.sign_k}_unbiased_feature_cache.pt'
         try:
-            unbiased_features = torch.load(feature_name).to(edge_index.device)
-            print(f'unbiased features found at {feature_name}.')
-            return unbiased_features
+            if self.load_features:  # Planetoid are randomly sampled so can't cache
+                print(
+                    'WARNING: for Cora, Citeseer and Pubmed the edges are randomly sampled and so cached features are leaking information')
+                unbiased_features = torch.load(feature_name).to(edge_index.device)
+                print(f'unbiased features found at {feature_name}.')
+                return unbiased_features
         except FileNotFoundError:
-            print(f'no unbiased features found at {feature_name}. Generating unbiased features')
+            print(f'no unbiased features found at {feature_name}')
+        print('Generating unbiased features')
         pos_unbiased_features = []
         #  don't load features from disk as we are generating them with each positive edge omitted
         old_flag = self.load_features
@@ -272,7 +283,8 @@ class HashDataset(Dataset):
         assert unbiased_features.shape[0] == len(
             self.links), 'unbiased features are inconsistent with the link object. Delete unbiased features file and regenerate'
         self.load_features = old_flag
-        torch.save(unbiased_features, feature_name)
+        if self.load_features:
+            torch.save(unbiased_features, feature_name)
         return unbiased_features
 
     def _read_subgraph_features(self, name: str, device: torch.device) -> bool:
@@ -285,7 +297,8 @@ class HashDataset(Dataset):
         retval = False
         # look on disk
         if self.cache_subgraph_features and os.path.exists(name):
-            print(f'looking for subgraph features in {name}')
+            print(f'looking for subgraph features in {name}. WARNING: for Cora, Citeseer and Pubmed '
+                  f'the edges are randomly sampled and so cached features are leaking information ')
             self.subgraph_features = torch.load(name).to(device)
             print(f"cached subgraph features found at: {name}")
             assert self.subgraph_features.shape[0] == len(
@@ -323,7 +336,7 @@ class HashDataset(Dataset):
             subgraph_cache_name = f'{self.root}{self.split}{grape_str}{year_str}'
         else:
             subgraph_cache_name = f'{self.root}{self.split}{grape_str}_negs{num_negs}{year_str}'
-        if self.use_zero_one:
+        if not self.use_zero_one:
             subgraph_cache_name += '_masked_features'
         subgraph_cache_name += hll_str
         subgraph_cache_name += end_str

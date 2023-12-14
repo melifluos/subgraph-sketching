@@ -11,9 +11,10 @@ from torch_geometric.data import Data
 from torch_geometric.utils import to_undirected, is_undirected, negative_sampling, from_networkx
 from ogb.linkproppred import PygLinkPropPredDataset
 import networkx as nx
+from torch_geometric.transforms import RandomLinkSplit
 
 from src.data import get_data, get_ogb_train_negs, make_obg_supervision_edges, get_ogb_data, get_loaders, \
-    sample_hard_negatives
+    check_ncc, use_lcc
 from src.utils import ROOT_DIR, get_pos_neg_edges
 from test_params import OPT
 
@@ -21,7 +22,7 @@ from test_params import OPT
 class DataTests(unittest.TestCase):
     def setUp(self):
         self.edge_index = tensor([[0, 2, 2, 1], [1, 0, 1, 2]]).t()
-        self.edge_weight = torch.ones(self.edge_index.size(0), dtype=int)
+        self.edge_weight = torch.ones(self.edge_index.size(0), dtype=torch.int)
         self.test_edges = tensor([[0, 1], [1, 2]]).t()
         self.num_nodes = 3
         self.neg_test_edges = tensor([[0, 1], [2, 0]]).t()
@@ -32,6 +33,7 @@ class DataTests(unittest.TestCase):
         self.test = {'edge': torch.randint(0, edges, size=(edges, 2)),
                      'edge_neg': torch.randint(0, edges, size=(edges, 2))}
         self.split_edge = {'train': self.train, 'valid': self.valid, 'test': self.test}
+        self.args = Namespace(**OPT)
 
     def test_make_obg_supervision_edges(self):
         labels, edges = make_obg_supervision_edges(self.split_edge, 'test', neg_edges=None)
@@ -118,3 +120,15 @@ class DataTests(unittest.TestCase):
         # reg_negs = negative_sampling(edge_index, num_nodes=self.num_nodes)
         # sample_hard_negatives(edge_index, self.num_nodes)
         # negs = sample_hard_negatives(self.edge_index, self.num_nodes)
+
+    def test_ncc(self):
+        dataset, splits, directed, eval_metric = get_data(self.args)
+        ncc = check_ncc(dataset.data)
+        dataset = use_lcc(dataset)
+        one_cc = check_ncc(dataset.data)
+        self.assertTrue(one_cc == 1)
+        transform = RandomLinkSplit(is_undirected=True, num_val=0.1, num_test=0.2,
+                                    add_negative_train_samples=False)
+        train_data, val_data, test_data = transform(dataset.data)
+        split_ncc = check_ncc(train_data)
+        self.assertTrue(ncc <= split_ncc)

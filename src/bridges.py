@@ -29,7 +29,7 @@ def find_bridges(edge_index: torch.Tensor, root: str) -> torch.Tensor:
         num_components = nx.number_connected_components(graph)
         graph.add_edge(*edge)  # Add the edge back
 
-        # If the number of components increases, the edge is critical
+        # If the number of components increases, the edge is a bridge
         if num_components > total_comps:
             bridges.append(edge)
     undirected_bridges = to_undirected(torch.tensor(bridges).T).T  # [num_bridges * 2, 2]
