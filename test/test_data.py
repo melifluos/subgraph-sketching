@@ -6,9 +6,10 @@ import os
 from argparse import Namespace
 
 import torch
+import matplotlib.pyplot as plt
 from torch import tensor
 from torch_geometric.data import Data
-from torch_geometric.utils import to_undirected, is_undirected, negative_sampling, from_networkx
+from torch_geometric.utils import to_undirected, is_undirected, to_networkx, from_networkx
 from ogb.linkproppred import PygLinkPropPredDataset
 import networkx as nx
 from torch_geometric.transforms import RandomLinkSplit
@@ -132,3 +133,8 @@ class DataTests(unittest.TestCase):
         train_data, val_data, test_data = transform(dataset.data)
         split_ncc = check_ncc(train_data)
         self.assertTrue(ncc <= split_ncc)
+        networkx_graph = to_networkx(train_data, to_undirected=True)
+        pos = nx.spring_layout(networkx_graph)  # Define a layout for the graph
+        nx.draw(networkx_graph, pos, with_labels=False, font_weight='bold', node_size=50, node_color='skyblue',
+                font_color='black', font_size=10, edge_color='gray')
+        plt.show()
