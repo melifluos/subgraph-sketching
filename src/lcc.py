@@ -2,7 +2,7 @@
 utils for getting the largest connected component of a graph
 """
 import numpy as np
-from torch_geometric.data import Data, InMemoryDataset
+from torch_geometric.data import InMemoryDataset
 
 def get_largest_connected_component(dataset: InMemoryDataset) -> np.ndarray:
   remaining_nodes = set(range(dataset.data.x.shape[0]))

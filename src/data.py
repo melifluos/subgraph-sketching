@@ -15,10 +15,11 @@ from torch_geometric.data import Data
 from torch_geometric.datasets import Planetoid
 from torch_geometric.transforms import RandomLinkSplit
 from torch_geometric.utils import (add_self_loops, negative_sampling,
-                                   to_undirected)
+                                   to_undirected, to_networkx)
 from torch_geometric.utils.num_nodes import maybe_num_nodes
 from torch_geometric.loader import DataLoader as pygDataLoader
 import wandb
+import networkx as nx
 
 from src.utils import ROOT_DIR, get_same_source_negs
 from src.lcc import get_largest_connected_component, remap_edges, get_node_mapper
@@ -26,7 +27,7 @@ from src.datasets.seal import get_train_val_test_datasets
 from src.datasets.elph import get_hashed_train_val_test_datasets, make_train_eval_data
 
 
-def get_loaders(args, dataset, splits, directed):
+def get_loaders(args, dataset, splits: dict, directed: bool) -> Tuple[DataLoader, DataLoader, DataLoader, DataLoader]:
     train_data, val_data, test_data = splits['train'], splits['valid'], splits['test']
     if args.model in {'ELPH', 'BUDDY'}:
         train_dataset, val_dataset, test_dataset = get_hashed_train_val_test_datasets(dataset, train_data, val_data,
@@ -111,6 +112,8 @@ def get_data(args) -> Tuple[Union[Planetoid,PygLinkPropPredDataset], dict, bool,
         transform = RandomLinkSplit(is_undirected=undirected, num_val=val_pct, num_test=test_pct,
                                     add_negative_train_samples=include_negatives)
         train_data, val_data, test_data = transform(dataset.data)
+        nccs = check_ncc(train_data)  # val and test will have the same of less connected components
+        print(f'train data has {nccs} connected components')
         splits = {'train': train_data, 'valid': val_data, 'test': test_data}
 
     return dataset, splits, directed, eval_metric
@@ -233,6 +236,15 @@ def make_obg_supervision_edges(split_edge, split, neg_edges=None):
     edge_label_index = torch.cat([pos_edges, neg_edges], dim=0).t()
     return edge_label, edge_label_index
 
+
+def check_ncc(data):
+    """
+    check the number of connected component
+    @param dataset:
+    @return:
+    """
+    graph = to_networkx(data, to_undirected=True)
+    return nx.number_connected_components(graph)
 
 def use_lcc(dataset):
     lcc = get_largest_connected_component(dataset)
