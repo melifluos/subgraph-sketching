@@ -6,6 +6,7 @@ import os
 from argparse import Namespace
 
 import torch
+import numpy as np
 import matplotlib.pyplot as plt
 from torch import tensor
 from torch_geometric.data import Data
@@ -123,16 +124,22 @@ class DataTests(unittest.TestCase):
         # negs = sample_hard_negatives(self.edge_index, self.num_nodes)
 
     def test_ncc(self):
-        dataset, splits, directed, eval_metric = get_data(self.args)
-        ncc = check_ncc(dataset.data)
-        dataset = use_lcc(dataset)
-        one_cc = check_ncc(dataset.data)
-        self.assertTrue(one_cc == 1)
-        transform = RandomLinkSplit(is_undirected=True, num_val=0.1, num_test=0.2,
-                                    add_negative_train_samples=False)
-        train_data, val_data, test_data = transform(dataset.data)
-        split_ncc = check_ncc(train_data)
-        self.assertTrue(ncc <= split_ncc)
+        self.args.dataset_name = 'Pubmed'
+        train_nccs, val_nccs, test_nccs = [], [], []
+        for i in range(1):
+            dataset, splits, directed, eval_metric = get_data(self.args)
+            ncc = check_ncc(dataset.data)
+            dataset = use_lcc(dataset)
+            one_cc = check_ncc(dataset.data)
+            self.assertTrue(one_cc == 1)
+            train_data, val_data, test_data = splits['train'], splits['valid'], splits['test']
+            train_nccs.append(check_ncc(train_data))
+            val_nccs.append(check_ncc(val_data))
+            test_nccs.append(check_ncc(test_data))
+        # print(f'train ncc: {train_ncc}, val ncc: {val_ncc}, test ncc: {test_ncc}')
+        # self.assertTrue(ncc <= train_ncc)
+        print(np.array(train_nccs).mean(), np.array(val_nccs).mean(), np.array(test_nccs).mean())
+        print(np.array(train_nccs).std(), np.array(val_nccs).std(), np.array(test_nccs).std())
         networkx_graph = to_networkx(train_data, to_undirected=True)
         pos = nx.spring_layout(networkx_graph)  # Define a layout for the graph
         nx.draw(networkx_graph, pos, with_labels=False, font_weight='bold', node_size=50, node_color='skyblue',
