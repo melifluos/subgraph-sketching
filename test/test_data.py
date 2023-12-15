@@ -6,9 +6,10 @@ import os
 from argparse import Namespace
 
 import torch
+import matplotlib.pyplot as plt
 from torch import tensor
 from torch_geometric.data import Data
-from torch_geometric.utils import to_undirected, is_undirected, negative_sampling, from_networkx
+from torch_geometric.utils import to_undirected, is_undirected, to_networkx, from_networkx
 from ogb.linkproppred import PygLinkPropPredDataset
 import networkx as nx
 from torch_geometric.transforms import RandomLinkSplit
@@ -22,7 +23,7 @@ from test_params import OPT
 class DataTests(unittest.TestCase):
     def setUp(self):
         self.edge_index = tensor([[0, 2, 2, 1], [1, 0, 1, 2]]).t()
-        self.edge_weight = torch.ones(self.edge_index.size(0), dtype=int)
+        self.edge_weight = torch.ones(self.edge_index.size(0), dtype=torch.int)
         self.test_edges = tensor([[0, 1], [1, 2]]).t()
         self.num_nodes = 3
         self.neg_test_edges = tensor([[0, 1], [2, 0]]).t()
@@ -122,6 +123,7 @@ class DataTests(unittest.TestCase):
         # negs = sample_hard_negatives(self.edge_index, self.num_nodes)
 
     def test_ncc(self):
+        self.args.dataset_name = 'Cora'
         dataset, splits, directed, eval_metric = get_data(self.args)
         ncc = check_ncc(dataset.data)
         dataset = use_lcc(dataset)
@@ -132,3 +134,8 @@ class DataTests(unittest.TestCase):
         train_data, val_data, test_data = transform(dataset.data)
         split_ncc = check_ncc(train_data)
         self.assertTrue(ncc <= split_ncc)
+        networkx_graph = to_networkx(train_data, to_undirected=True)
+        pos = nx.spring_layout(networkx_graph)  # Define a layout for the graph
+        nx.draw(networkx_graph, pos, with_labels=False, font_weight='bold', node_size=50, node_color='skyblue',
+                font_color='black', font_size=10, edge_color='gray')
+        plt.show()
