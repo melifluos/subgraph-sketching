@@ -134,6 +134,7 @@ class HashDataset(Dataset):
         calculated by removing the edge from the graph and propagating the node features. If the edge is a bridge
         then the graph will be disconnected and the node features will be zero.
         """
+        #todo: decide how to handle bridges
         if True:
             mask = self.get_bridge_mask_from_subgraph_features()
             torch.save(mask, f'{self.root}/bridge_mask.pt')

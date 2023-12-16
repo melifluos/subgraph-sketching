@@ -25,7 +25,7 @@ from src.utils import ROOT_DIR, get_same_source_negs
 from src.lcc import get_largest_connected_component, remap_edges, get_node_mapper
 from src.datasets.seal import get_train_val_test_datasets
 from src.datasets.elph import get_hashed_train_val_test_datasets, make_train_eval_data
-
+from src.splits import get_splits
 
 def get_loaders(args, dataset, splits: dict, directed: bool) -> Tuple[DataLoader, DataLoader, DataLoader, DataLoader]:
     train_data, val_data, test_data = splits['train'], splits['valid'], splits['test']
@@ -109,12 +109,16 @@ def get_data(args) -> Tuple[Union[Planetoid,PygLinkPropPredDataset], dict, bool,
             data, split_edge = filter_by_year(data, split_edge, args.year)
         splits = get_ogb_data(data, split_edge, dataset_name, args.num_negs)
     else:  # make random splits
-        transform = RandomLinkSplit(is_undirected=undirected, num_val=val_pct, num_test=test_pct,
-                                    add_negative_train_samples=include_negatives)
-        train_data, val_data, test_data = transform(dataset.data)
-        nccs = check_ncc(train_data)  # val and test will have the same of less connected components
-        print(f'train data has {nccs} connected components')
-        splits = {'train': train_data, 'valid': val_data, 'test': test_data}
+        if args.use_grape:
+            # grape splits ensure that the train graph has no more connected components that the original graph
+            splits = get_splits(dataset_name)
+        else:
+            transform = RandomLinkSplit(is_undirected=undirected, num_val=val_pct, num_test=test_pct,
+                                        add_negative_train_samples=include_negatives)
+            train_data, val_data, test_data = transform(dataset.data)
+            nccs = check_ncc(train_data)  # val and test will have the same of less connected components
+            print(f'train data has {nccs} connected components')
+            splits = {'train': train_data, 'valid': val_data, 'test': test_data}
 
     return dataset, splits, directed, eval_metric
 

@@ -61,7 +61,7 @@ def run(args):
             evaluator = Evaluator(name='ogbl-ppa')  # this sets HR@100 as the metric
         emb = select_embedding(args, dataset.data.num_nodes, device)
         model, optimizer = select_model(args, dataset, emb, device)
-        val_res = test_res = best_epoch = 0
+        train_res = val_res = test_res = best_epoch = 0
         print(f'running repetition {rep}')
         if rep == 0:
             print_model_params(model)

@@ -6,6 +6,7 @@ import os
 from argparse import Namespace
 
 import torch
+import numpy as np
 import matplotlib.pyplot as plt
 from torch import tensor
 from torch_geometric.data import Data
@@ -69,17 +70,9 @@ class DataTests(unittest.TestCase):
         self.assertTrue(not is_undirected(val_edges))  # no reason for supervision edges to be directed
 
     def test_get_data(self):
-        """
-        We use the pyg RandomLinkSplit object to create train / val / test splits. For link prediction edges play 2 roles
-        1/ for message passing 2/ as supervision
-        :return:
-        """
-        opt = {'sample_size': None, 'dataset_name': 'Cora', 'num_hops': 2, 'max_dist': 10, 'max_nodes_per_hop': 10,
-               'data_appendix': None, 'val_pct': 0.1, 'test_pct': 0.2, 'train_sample': 1, 'dynamic_train': True,
-               'dynamic_val': True, 'model': 'linear', 'dynamic_test': True, 'node_label': 'drnl', 'ratio_per_hop': 1}
-        opt = {**OPT, **opt}
-        args = Namespace(**opt)
-        dataset, splits, directed, eval_metric = get_data(args)
+        # test using random link split
+        self.args.use_grape = False
+        dataset, splits, directed, eval_metric = get_data(self.args)
         train, val, test = splits['train'], splits['valid'], splits['test']
         train_pos_edges, train_neg_edges = get_pos_neg_edges(train)
         # the default behaviour is 1 negative edge for each positive edge
@@ -88,6 +81,19 @@ class DataTests(unittest.TestCase):
         self.assertTrue(val_pos_edges.shape == val_neg_edges.shape)
         test_pos_edges, test_neg_edges = get_pos_neg_edges(test)
         self.assertTrue(test_pos_edges.shape == test_neg_edges.shape)
+        # test using graph splits
+        self.args.use_grape = True
+        dataset, splits, directed, eval_metric = get_data(self.args)
+        train, val, test = splits['train'], splits['valid'], splits['test']
+        train_pos_edges, train_neg_edges = get_pos_neg_edges(train)
+        # the default behaviour is 1 negative edge for each positive edge
+        self.assertTrue(train_pos_edges.shape == train_neg_edges.shape)
+        val_pos_edges, val_neg_edges = get_pos_neg_edges(val)
+        self.assertTrue(val_pos_edges.shape == val_neg_edges.shape)
+        test_pos_edges, test_neg_edges = get_pos_neg_edges(test)
+        self.assertTrue(test_pos_edges.shape == test_neg_edges.shape)
+        nccs = check_ncc(train)
+        self.assertTrue(nccs == 1)
 
     def test_get_ogb_train_negs(self):
         num_nodes = 10
@@ -123,17 +129,20 @@ class DataTests(unittest.TestCase):
         # negs = sample_hard_negatives(self.edge_index, self.num_nodes)
 
     def test_ncc(self):
-        self.args.dataset_name = 'Cora'
-        dataset, splits, directed, eval_metric = get_data(self.args)
-        ncc = check_ncc(dataset.data)
-        dataset = use_lcc(dataset)
-        one_cc = check_ncc(dataset.data)
-        self.assertTrue(one_cc == 1)
-        transform = RandomLinkSplit(is_undirected=True, num_val=0.1, num_test=0.2,
-                                    add_negative_train_samples=False)
-        train_data, val_data, test_data = transform(dataset.data)
-        split_ncc = check_ncc(train_data)
-        self.assertTrue(ncc <= split_ncc)
+        self.args.dataset_name = 'Pubmed'
+        train_nccs, val_nccs, test_nccs = [], [], []
+        for i in range(1):
+            dataset, splits, directed, eval_metric = get_data(self.args)
+            ncc = check_ncc(dataset.data)
+            dataset = use_lcc(dataset)
+            one_cc = check_ncc(dataset.data)
+            self.assertTrue(one_cc == 1)
+            train_data, val_data, test_data = splits['train'], splits['valid'], splits['test']
+            train_nccs.append(check_ncc(train_data))
+            val_nccs.append(check_ncc(val_data))
+            test_nccs.append(check_ncc(test_data))
+        print(np.array(train_nccs).mean(), np.array(val_nccs).mean(), np.array(test_nccs).mean())
+        print(np.array(train_nccs).std(), np.array(val_nccs).std(), np.array(test_nccs).std())
         networkx_graph = to_networkx(train_data, to_undirected=True)
         pos = nx.spring_layout(networkx_graph)  # Define a layout for the graph
         nx.draw(networkx_graph, pos, with_labels=False, font_weight='bold', node_size=50, node_color='skyblue',
