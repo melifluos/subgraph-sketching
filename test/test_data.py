@@ -75,16 +75,23 @@ class DataTests(unittest.TestCase):
         dataset, splits, directed, eval_metric = get_data(self.args)
         train, val, test = splits['train'], splits['valid'], splits['test']
         train_pos_edges, train_neg_edges = get_pos_neg_edges(train)
+        # val and train message passing edges are the same
+        self.assertTrue(torch.all(torch.eq(train.edge_index, val.edge_index)))
         # the default behaviour is 1 negative edge for each positive edge
         self.assertTrue(train_pos_edges.shape == train_neg_edges.shape)
         val_pos_edges, val_neg_edges = get_pos_neg_edges(val)
         self.assertTrue(val_pos_edges.shape == val_neg_edges.shape)
         test_pos_edges, test_neg_edges = get_pos_neg_edges(test)
         self.assertTrue(test_pos_edges.shape == test_neg_edges.shape)
+        # check that test message passing edges are train mp + val pos edges. Pyg splits use directed test / val
+        # supervision edges, so need to double the number of val_pos_edges
+        self.assertTrue(test.edge_index.shape[1] == train.edge_index.shape[1] + 2 * val_pos_edges.shape[0])
         # test using grape splits
-        self.args.use_grape = True
+        self.args.connected_holdout = True
         dataset, splits, directed, eval_metric = get_data(self.args)
         train, val, test = splits['train'], splits['valid'], splits['test']
+        self.assertTrue(torch.all(torch.eq(train.edge_index, val.edge_index)))
+        # val and train message passing edges are the same
         train_pos_edges, train_neg_edges = get_pos_neg_edges(train)
         # the default behaviour is 1 negative edge for each positive edge
         self.assertTrue(train_pos_edges.shape == train_neg_edges.shape)
@@ -94,6 +101,12 @@ class DataTests(unittest.TestCase):
         self.assertTrue(test_pos_edges.shape == test_neg_edges.shape)
         nccs = check_ncc(train)
         self.assertTrue(nccs == 1)
+        # grape splits use undirected test / val supervision edges (so twice as many edges)
+        self.assertTrue(test.edge_index.shape[1] == train.edge_index.shape[1] + val_pos_edges.shape[0])
+        # check that the test edges are disjoint from the train and val edges
+        test_pos_set = set([tuple(edge) for edge in test_pos_edges.tolist()])
+        [self.assertTrue(tuple(link) not in test_pos_set) for link in test.edge_index.tolist()]
+
 
     def test_get_ogb_train_negs(self):
         num_nodes = 10

@@ -53,7 +53,7 @@ class HashDataset(Dataset):
         self.use_zero_one = args.use_zero_one
         self.cache_subgraph_features = args.cache_subgraph_features
         self.max_hash_hops = args.max_hash_hops
-        self.self_loops = args.self_loops
+        self.self_loops = bool(args.self_loops)
         self.use_feature = args.use_feature
         self.use_RA = args.use_RA
         self.hll_p = args.hll_p

@@ -10,7 +10,7 @@ This file contains the code to generate splits that maintain graph topology
 import grape
 import numpy as np
 import torch
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 from torch_geometric.data import Data
 from grape.datasets.linqs import get_words_data, Cora, CiteSeer, PubMedDiabetes
@@ -65,7 +65,7 @@ def get_splits(dataset_name: str, use_lcc=True, seed=None, negs_per_pos=1) -> di
         assert graph.get_number_of_connected_components()[0] == 1
         print(
             f'The lcc has {graph.get_number_of_nodes()} nodes and {graph.get_number_of_directed_edges() / 2.} edges')
-    x = data.loc[graph.get_node_names()].values
+    x = torch.tensor(data.loc[graph.get_node_names()].values, dtype=torch.float32)
     edge_index = graph.get_directed_edge_node_ids()
     assert edge_index.min() == 0
     assert edge_index.max() + 1 == graph.get_number_of_nodes()
@@ -107,38 +107,39 @@ def graph_to_edge_index(graph):
     return torch.LongTensor(np.int64(graph.get_directed_edge_node_ids()))
 
 
-def grape_graph_to_pyg_data(pos, neg, x: torch.Tensor) -> Data:
+def grape_graph_to_pyg_data(pos, neg, x: torch.Tensor) -> Dict[str, Data]:
     """
     convert a graph from the grape library to a pytorch geometric data object
-    @param edge_index: [2, n_edges] message passing graph
-    @param edges: (pos_edges, neg_edges) positive and negative edges [n_edges, 2]
+    @param pos: (train, val, test) splits of positive edges in grape graph classes
+    @param neg: (train, val, test) splits of negative edges in grape graph classes
     @param x: node features [n_nodes, n_features]
     @return:
     """
     # get train edge_index
     train_edge_index = graph_to_edge_index(pos[0])  # [edges, 2]
-    val_pos_supervision_edges = graph_to_edge_index(pos[1])  # [edges, 2]
-    test_pos_supervision_edges = graph_to_edge_index(pos[2])  # [edges, 2]
-    test_edge_index = torch.cat([train_edge_index, val_pos_supervision_edges], dim=0)  # [edges, 2]
+    val_pos_edges = graph_to_edge_index(pos[1])  # [edges, 2]
+    test_pos_edges = graph_to_edge_index(pos[2])  # [edges, 2]
+    test_edge_index = torch.cat([train_edge_index, val_pos_edges], dim=0)  # [edges, 2]
     # train uses the same message passing edges as supervision edges
     train_data = Data(x=x, edge_index=train_edge_index.T)
     train_negs = graph_to_edge_index(neg[0])
     train_data['edge_label_index'] = torch.cat([train_edge_index, train_negs], dim=0).T  # [2, n_supervision_edges]
-    train_data['edge_label'] = torch.cat([torch.ones(train_edge_index.shape[0]), torch.zeros(neg[0].shape[0])], dim=0)
+    train_data['edge_label'] = torch.cat([torch.ones(train_edge_index.shape[0]), torch.zeros(train_negs.shape[0])],
+                                         dim=0)
     # val uses the same message passing edges as train, but disjoint supervision edges
     val_data = Data(x=x, edge_index=train_edge_index.T)
     val_negs = graph_to_edge_index(neg[1])
-    val_data['edge_label_index'] = torch.cat([val_pos_supervision_edges, val_negs], dim=0).T  # [2, n_supervision_edges]
+    val_data['edge_label_index'] = torch.cat([val_pos_edges, val_negs], dim=0).T  # [2, n_supervision_edges]
     val_data['edge_label'] = torch.cat(
-        [torch.ones(val_pos_supervision_edges.shape[0]), torch.zeros(val_negs[0].shape[0])], dim=0)
+        [torch.ones(val_pos_edges.shape[0]), torch.zeros(val_negs.shape[0])], dim=0)
     # test uses the union of the train message passing edges and the val pos supervision edges as message passing edges
     # and disjoint supervision edges
     test_data = Data(x=x, edge_index=test_edge_index.T)
     test_negs = graph_to_edge_index(neg[2])
-    test_data['edge_label_index'] = torch.cat([test_pos_supervision_edges, test_negs],
+    test_data['edge_label_index'] = torch.cat([test_pos_edges, test_negs],
                                               dim=0).T  # [2, n_supervision_edges]
     test_data['edge_label'] = torch.cat(
-        [torch.ones(test_pos_supervision_edges.shape[0]), torch.zeros(test_negs[0].shape[0])], dim=0)
+        [torch.ones(test_pos_edges.shape[0]), torch.zeros(test_negs.shape[0])], dim=0)
     return {'train': train_data, 'valid': val_data, 'test': test_data}
 
 
