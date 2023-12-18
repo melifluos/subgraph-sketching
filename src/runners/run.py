@@ -163,6 +163,7 @@ if __name__ == '__main__':
     parser.add_argument('--year', type=int, default=0, help='filter training data from before this year')
     parser.add_argument('--use_grape', action='store_true', help='use node features')
     parser.add_argument('--use_grape_exact', action='store_true', help='use node features')
+    parser.add_argument('--connected_holdout', action='store_true', help='ensure a single connected component after splits')
     # GNN settings
     parser.add_argument('--model', type=str, default='BUDDY')
     parser.add_argument('--hidden_channels', type=int, default=1024)

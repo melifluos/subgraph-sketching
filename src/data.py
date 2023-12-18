@@ -109,7 +109,7 @@ def get_data(args) -> Tuple[Union[Planetoid,PygLinkPropPredDataset], dict, bool,
             data, split_edge = filter_by_year(data, split_edge, args.year)
         splits = get_ogb_data(data, split_edge, dataset_name, args.num_negs)
     else:  # make random splits
-        if args.use_grape:
+        if args.connected_holdout:
             # grape splits ensure that the train graph has no more connected components that the original graph
             splits = get_splits(dataset_name)
         else:

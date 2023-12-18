@@ -64,17 +64,14 @@ def get_splits(dataset_name: str, use_lcc=True, seed=None, negs_per_pos=1) -> di
         graph = graph.remove_components(top_k_components=1)
         assert graph.get_number_of_connected_components()[0] == 1
         print(
-            f'The lcc has {graph.get_number_of_nodes} nodes and {graph.get_number_of_directed_edges() / 2.} edges')
+            f'The lcc has {graph.get_number_of_nodes()} nodes and {graph.get_number_of_directed_edges() / 2.} edges')
     x = data.loc[graph.get_node_names()].values
     edge_index = graph.get_directed_edge_node_ids()
     assert edge_index.min() == 0
     assert edge_index.max() + 1 == graph.get_number_of_nodes()
     pos = get_grape_splits(graph, seed=seed)
     neg = get_grape_neg_splits(graph, seed=seed, negs_per_pos=negs_per_pos)
-    pyg_graphs = []
-    for edges in zip(pos, neg):
-        pyg_graphs.append(grape_graph_to_pyg_data(edge_index, edges, x))
-    retval = {'train': pyg_graphs[0], 'valid': pyg_graphs[1], 'test': pyg_graphs[2]}
+    retval = grape_graph_to_pyg_data(pos, neg, x)
     return retval
 
 
@@ -105,11 +102,12 @@ def get_grape_neg_splits(graph, seed=None, negs_per_pos: int = 1):
     assert negative_graph.get_number_of_edges() == sub_neg_train.get_number_of_edges() + neg_val.get_number_of_edges() + neg_test.get_number_of_edges()
     return sub_neg_train, neg_val, neg_test
 
+
 def graph_to_edge_index(graph):
     return torch.LongTensor(np.int64(graph.get_directed_edge_node_ids()))
 
-def grape_graph_to_pyg_data(edge_index: torch.Tensor, edges: Tuple[torch.Tensor, torch.Tensor],
-                            x: torch.Tensor) -> Data:
+
+def grape_graph_to_pyg_data(pos, neg, x: torch.Tensor) -> Data:
     """
     convert a graph from the grape library to a pytorch geometric data object
     @param edge_index: [2, n_edges] message passing graph
@@ -117,14 +115,31 @@ def grape_graph_to_pyg_data(edge_index: torch.Tensor, edges: Tuple[torch.Tensor,
     @param x: node features [n_nodes, n_features]
     @return:
     """
-    edge_index = torch.LongTensor(np.int64(edge_index.T))  # [2,n_edges] message passing graph
-    x = torch.FloatTensor(x)  # [n_nodes, n_features] node features
-    pos_edges = graph_to_edge_index(edges[0])  # [n_pos_edges, 2] positive edges
-    neg_edges = graph_to_edge_index(edges[1])  # [n_neg_edges, 2] positive edges
-    data = Data(x=x, edge_index=edge_index)
-    data['edge_label_index'] = torch.cat([pos_edges, neg_edges], dim=0).T  # [2, n_supervision_edges]
-    data['edge_label'] = torch.cat([torch.ones(pos_edges.size(0)), torch.zeros(neg_edges.size(0))], dim=0)
-    return data
+    # get train edge_index
+    train_edge_index = graph_to_edge_index(pos[0])  # [edges, 2]
+    val_pos_supervision_edges = graph_to_edge_index(pos[1])  # [edges, 2]
+    test_pos_supervision_edges = graph_to_edge_index(pos[2])  # [edges, 2]
+    test_edge_index = torch.cat([train_edge_index, val_pos_supervision_edges], dim=0)  # [edges, 2]
+    # train uses the same message passing edges as supervision edges
+    train_data = Data(x=x, edge_index=train_edge_index.T)
+    train_negs = graph_to_edge_index(neg[0])
+    train_data['edge_label_index'] = torch.cat([train_edge_index, train_negs], dim=0).T  # [2, n_supervision_edges]
+    train_data['edge_label'] = torch.cat([torch.ones(train_edge_index.shape[0]), torch.zeros(neg[0].shape[0])], dim=0)
+    # val uses the same message passing edges as train, but disjoint supervision edges
+    val_data = Data(x=x, edge_index=train_edge_index.T)
+    val_negs = graph_to_edge_index(neg[1])
+    val_data['edge_label_index'] = torch.cat([val_pos_supervision_edges, val_negs], dim=0).T  # [2, n_supervision_edges]
+    val_data['edge_label'] = torch.cat(
+        [torch.ones(val_pos_supervision_edges.shape[0]), torch.zeros(val_negs[0].shape[0])], dim=0)
+    # test uses the union of the train message passing edges and the val pos supervision edges as message passing edges
+    # and disjoint supervision edges
+    test_data = Data(x=x, edge_index=test_edge_index.T)
+    test_negs = graph_to_edge_index(neg[2])
+    test_data['edge_label_index'] = torch.cat([test_pos_supervision_edges, test_negs],
+                                              dim=0).T  # [2, n_supervision_edges]
+    test_data['edge_label'] = torch.cat(
+        [torch.ones(test_pos_supervision_edges.shape[0]), torch.zeros(test_negs[0].shape[0])], dim=0)
+    return {'train': train_data, 'valid': val_data, 'test': test_data}
 
 
 if __name__ == "__main__":

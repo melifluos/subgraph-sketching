@@ -81,7 +81,7 @@ class DataTests(unittest.TestCase):
         self.assertTrue(val_pos_edges.shape == val_neg_edges.shape)
         test_pos_edges, test_neg_edges = get_pos_neg_edges(test)
         self.assertTrue(test_pos_edges.shape == test_neg_edges.shape)
-        # test using graph splits
+        # test using grape splits
         self.args.use_grape = True
         dataset, splits, directed, eval_metric = get_data(self.args)
         train, val, test = splits['train'], splits['valid'], splits['test']
