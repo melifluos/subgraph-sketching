@@ -159,8 +159,8 @@ def sample_data(data, sample_arg):
 
 
 def get_train_val_test_datasets(dataset, train_data, val_data, test_data, args):
-    sample = 'all' if not args.sample_size else args.sample_size
-    path = f'{dataset.root}_seal_{sample}_hops_{args.num_hops}_maxdist_{args.max_dist}_mnph_{args.max_nodes_per_hop}{args.data_appendix}'
+    sample = 'all' if not args.train_samples else args.train_samples
+    path = f'{dataset.root}_seal_{sample}_hops_{args.num_hops}_maxdist_{args.max_dist}_mnph_{args.max_nodes_per_hop}'
     print(f'seal data path: {path}')
     use_coalesce = True if args.dataset_name == 'ogbl-collab' else False
     # get percents used only for naming the SEAL dataset files and caching

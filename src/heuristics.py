@@ -26,6 +26,9 @@ def CN(A, edge_index, batch_size=100000):
     print(f'evaluated Common Neighbours for {len(scores)} edges')
     return torch.FloatTensor(scores), edge_index
 
+def Random(A, edge_index, batch_size=100000):
+    scores = np.random.rand(edge_index.size(0))
+    return torch.FloatTensor(scores), edge_index
 
 def AA(A, edge_index, batch_size=100000):
     """

@@ -44,8 +44,8 @@ def get_graph(dataset_name):
     else:
         raise ValueError(f'Unknown dataset {dataset_name}')
     graph, data = get_words_data(dataset)
-
-    return graph, data
+    # the raw data has a small number of self-loop e.g Pubmed has 3. These are typically errors
+    return graph.remove_selfloops(), data
 
 
 def get_splits(dataset_name: str, use_lcc=True, seed=None, negs_per_pos=1) -> dict[str, Data]:

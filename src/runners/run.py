@@ -125,6 +125,8 @@ def select_model(args, dataset, emb, device):
         model = BUDDY(args, dataset.num_features, node_embedding=emb).to(device)
     elif args.model == 'ELPH':
         model = ELPH(args, dataset.num_features, node_embedding=emb).to(device)
+    elif args.model == 'random':
+        model = Random(args, dataset.num_features, node_embedding=emb).to(device)
     else:
         raise NotImplementedError
     parameters = list(model.parameters())
