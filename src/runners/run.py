@@ -125,8 +125,6 @@ def select_model(args, dataset, emb, device):
         model = BUDDY(args, dataset.num_features, node_embedding=emb).to(device)
     elif args.model == 'ELPH':
         model = ELPH(args, dataset.num_features, node_embedding=emb).to(device)
-    elif args.model == 'random':
-        model = Random(args, dataset.num_features, node_embedding=emb).to(device)
     else:
         raise NotImplementedError
     parameters = list(model.parameters())
@@ -146,7 +144,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Efficient Link Prediction with Hashes (ELPH)')
     parser.add_argument('--dataset_name', type=str, default='Cora',
                         choices=['Cora', 'Citeseer', 'Pubmed', 'ogbl-ppa', 'ogbl-collab', 'ogbl-ddi',
-                                 'ogbl-citation2'])
+                                 'ogbl-citation2', 'ogbl-vessel'])
     parser.add_argument('--val_pct', type=float, default=0.1,
                         help='the percentage of supervision edges to be used for validation. These edges will not appear'
                              ' in the training set and will only be used as message passing edges in the test set')

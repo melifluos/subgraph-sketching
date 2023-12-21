@@ -87,15 +87,22 @@ def get_grape_splits(graph: grape.Graph, seed: Optional[int] = None) -> (grape.G
     return sub_train, val, test
 
 
-def get_grape_neg_splits(graph, seed=None, negs_per_pos: int = 1):
+def get_grape_neg_splits(graph, seed=None, negs_per_pos: int = 1, scale_free=True):
     """
-    get train, val, test splits from a graph
+    get negative edges for train, val, test splits from a graph.
+    - the negatives are guaranteed to not intersect with the positives
+    - each node will be within the same connected component
+    - nodes are sampled using the node degree, such that higher degree nodes
+    appear more frequently in the negative edges
+    https://www.biorxiv.org/content/10.1101/2022.11.21.517376v1.abstract
     :param graph: a graph from the grape library
     :return: train, val, test splits
     """
     # there is a small bias here because the negatives are sampled from the distribution of the entire graph
+    # and so will not intersect with positive test edges. In real applications this is not possible
     negative_graph = graph.sample_negative_graph(
         number_of_negative_samples=negs_per_pos * graph.get_number_of_directed_edges(), random_state=seed,
+        use_scale_free_distribution=scale_free,
     )
     neg_train, neg_test = negative_graph.random_holdout(train_size=0.8, random_state=seed)
     sub_neg_train, neg_val = neg_train.random_holdout(train_size=7 / 8., random_state=seed)

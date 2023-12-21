@@ -96,6 +96,8 @@ def get_data(args) -> Tuple[Union[Planetoid,PygLinkPropPredDataset], dict, bool,
     if dataset_name.startswith('ogbl-citation'):
         eval_metric = 'mrr'
         directed = True
+    if dataset_name.startswith('ogbl-vessel'):
+        eval_metric = 'auc'
 
     if use_lcc_flag:
         dataset = use_lcc(dataset)

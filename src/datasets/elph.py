@@ -137,9 +137,9 @@ class HashDataset(Dataset):
         #todo: decide how to handle bridges
         if True:
             mask = self.get_bridge_mask_from_subgraph_features()
-            torch.save(mask, f'{self.root}/bridge_mask.pt')
-            bridges = find_bridges(self.edge_index, self.root)
-            torch.save(self.subgraph_features, f'{self.root}/subgraph_features.pt')
+            # torch.save(mask, f'{self.root}/bridge_mask.pt')
+            # bridges = find_bridges(self.edge_index, self.root)
+            # torch.save(self.subgraph_features, f'{self.root}/subgraph_features.pt')
             n_bridges = len(self.links) - mask.sum()
             print(f'found and removing {n_bridges / 2} bridge edges from training set using subgraph features')
         else:
@@ -331,6 +331,8 @@ class HashDataset(Dataset):
                     grape_str += '_exact_unbiased'
                 else:
                     grape_str += '_exact_biased'
+            if self.normalise_grape:
+                grape_str += '_normalised'
         else:
             grape_str = ''
         if num_negs == 1 or self.split != 'train':
