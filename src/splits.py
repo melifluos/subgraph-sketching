@@ -48,16 +48,16 @@ def get_graph(dataset_name):
     return graph.remove_selfloops(), data
 
 
-def get_splits(dataset_name: str, use_lcc=True, seed=None, negs_per_pos=1) -> dict[str, Data]:
+def get_splits(args, use_lcc=True, seed=None) -> dict[str, Data]:
     """
     get train, val, test splits from a graph
     :param dataset_name: string name of the dataset
     :return: train, val, test splits
     """
-    graph, data = get_graph(dataset_name)
+    graph, data = get_graph(args.dataset_name)
     nccs = graph.get_number_of_connected_components()
     print(
-        f'There are {nccs[0]} connected components in {dataset_name}. with {graph.get_number_of_nodes()} nodes '
+        f'There are {nccs[0]} connected components in {args.dataset_name}. with {graph.get_number_of_nodes()} nodes '
         f'and {graph.get_number_of_directed_edges() / 2.} edges')
     if use_lcc:
         print(f'Using the largest connected component')
@@ -70,7 +70,7 @@ def get_splits(dataset_name: str, use_lcc=True, seed=None, negs_per_pos=1) -> di
     assert edge_index.min() == 0
     assert edge_index.max() + 1 == graph.get_number_of_nodes()
     pos = get_grape_splits(graph, seed=seed)
-    neg = get_grape_neg_splits(graph, seed=seed, negs_per_pos=negs_per_pos)
+    neg = get_grape_neg_splits(graph, seed=seed, negs_per_pos=args.num_negs, scale_free=bool(args.scale_free_negs))
     retval = grape_graph_to_pyg_data(pos, neg, x)
     return retval
 

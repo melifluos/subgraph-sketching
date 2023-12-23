@@ -6,7 +6,6 @@ import os
 import time
 from typing import Optional, Tuple, Union
 
-
 import torch
 from torch.utils.data import DataLoader
 from torch import Tensor
@@ -26,6 +25,7 @@ from src.lcc import get_largest_connected_component, remap_edges, get_node_mappe
 from src.datasets.seal import get_train_val_test_datasets
 from src.datasets.elph import get_hashed_train_val_test_datasets, make_train_eval_data
 from src.splits import get_splits
+
 
 def get_loaders(args, dataset, splits: dict, directed: bool) -> Tuple[DataLoader, DataLoader, DataLoader, DataLoader]:
     train_data, val_data, test_data = splits['train'], splits['valid'], splits['test']
@@ -53,7 +53,8 @@ def get_loaders(args, dataset, splits: dict, directed: bool) -> Tuple[DataLoader
                      num_workers=args.num_workers)
     if (args.dataset_name == 'ogbl-citation2') and (args.model in {'ELPH', 'BUDDY'}):
         train_eval_loader = dl(
-            make_train_eval_data(train_dataset, dataset.num_nodes, n_pos_samples=5000), batch_size=args.batch_size, shuffle=False,
+            make_train_eval_data(train_dataset, dataset.num_nodes, n_pos_samples=5000), batch_size=args.batch_size,
+            shuffle=False,
             num_workers=args.num_workers)
     else:
         # todo change this so that eval doesn't have to use the full training set
@@ -62,7 +63,7 @@ def get_loaders(args, dataset, splits: dict, directed: bool) -> Tuple[DataLoader
     return train_loader, train_eval_loader, val_loader, test_loader
 
 
-def get_data(args) -> Tuple[Union[Planetoid,PygLinkPropPredDataset], dict, bool, str]:
+def get_data(args) -> Tuple[Union[Planetoid, PygLinkPropPredDataset], dict, bool, str]:
     """
     Read the dataset and generate train, val and test splits.
     For GNN link prediction edges play 2 roles 1/ message passing edges 2/ supervision edges
@@ -96,6 +97,8 @@ def get_data(args) -> Tuple[Union[Planetoid,PygLinkPropPredDataset], dict, bool,
     if dataset_name.startswith('ogbl-citation'):
         eval_metric = 'mrr'
         directed = True
+    if dataset_name.startswith('ogbl-vessel'):
+        eval_metric = 'auc'
 
     if use_lcc_flag:
         dataset = use_lcc(dataset)
@@ -111,7 +114,7 @@ def get_data(args) -> Tuple[Union[Planetoid,PygLinkPropPredDataset], dict, bool,
     else:  # make random splits
         if args.connected_holdout:
             # grape splits ensure that the train graph has no more connected components that the original graph
-            splits = get_splits(dataset_name)
+            splits = get_splits(args, use_lcc_flag)
         else:
             transform = RandomLinkSplit(is_undirected=undirected, num_val=val_pct, num_test=test_pct,
                                         add_negative_train_samples=include_negatives)
@@ -250,6 +253,7 @@ def check_ncc(data):
     graph = to_networkx(data, to_undirected=True)
     return nx.number_connected_components(graph)
 
+
 def use_lcc(dataset):
     lcc = get_largest_connected_component(dataset)
 
@@ -271,9 +275,10 @@ def use_lcc(dataset):
     dataset.data = data
     return dataset
 
+
 def sample_hard_negatives(edge_index: Tensor,
-                      num_nodes: Optional[Union[int, Tuple[int, int]]] = None,
-                      num_neg_samples: Optional[int] = None)-> Tensor:
+                          num_nodes: Optional[Union[int, Tuple[int, int]]] = None,
+                          num_neg_samples: Optional[int] = None) -> Tensor:
     """
     Sample hard negatives for each edge in edge_index
     @param edge_index:
