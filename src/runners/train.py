@@ -44,6 +44,9 @@ def train_buddy(model, optimizer, train_loader: DataLoader, args, device: torch.
     batch_processing_times = []
     loader = DataLoader(range(len(links)), args.batch_size, shuffle=True)
     for batch_count, indices in enumerate(tqdm(loader)):
+        # corner case for the last batch that will break the batch norm
+        if len(indices) == 1:
+            continue
         # do node level things
         if model.node_embedding is not None:
             if args.propagate_embeddings:
