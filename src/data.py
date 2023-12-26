@@ -24,6 +24,7 @@ from src.utils import ROOT_DIR, get_same_source_negs
 from src.lcc import get_largest_connected_component, remap_edges, get_node_mapper
 from src.datasets.seal import get_train_val_test_datasets
 from src.datasets.elph import get_hashed_train_val_test_datasets, make_train_eval_data
+from src.datasets.gnn import get_gnn_datasets
 from src.splits import get_splits
 
 
@@ -31,6 +32,9 @@ def get_loaders(args, dataset, splits: dict, directed: bool) -> Tuple[DataLoader
     train_data, val_data, test_data = splits['train'], splits['valid'], splits['test']
     if args.model in {'ELPH', 'BUDDY'}:
         train_dataset, val_dataset, test_dataset = get_hashed_train_val_test_datasets(dataset, train_data, val_data,
+                                                                                      test_data, args, directed)
+    elif args.model in {'GCN', 'SAGE'}:
+        train_dataset, val_dataset, test_dataset = get_gnn_datasets(dataset, train_data, val_data,
                                                                                       test_data, args, directed)
     else:
         t0 = time.time()

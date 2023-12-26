@@ -19,6 +19,8 @@ def get_test_func(model_str):
         return get_elph_preds
     elif model_str == 'BUDDY':
         return get_buddy_preds
+    elif model_str.lower() in {'gcn', 'sage'}:
+        return get_gnn_preds
     else:
         return get_preds
 
@@ -166,6 +168,32 @@ def get_split_samples(split, args, dataset_len):
     else:
         raise NotImplementedError(f'split: {split} is not a valid split')
     return samples
+
+
+@torch.no_grad()
+def get_gnn_preds(model, loader, device, args, split=None):
+    t0 = time.time()
+    preds = []
+    data = loader.dataset
+    # hydrate edges
+    links = data.links
+    labels = torch.tensor(data.labels)
+    # eval_batch_size should be the largest that fits on GPU
+    loader = DataLoader(range(len(links)), args.eval_batch_size, shuffle=False)
+    # get node features
+    node_features = model(data.x.to(device), data.edge_index.to(device))
+    for batch_count, indices in enumerate(tqdm(loader)):
+        curr_links = links[indices].to(device)
+        batch_node_features = None if node_features is None else node_features[curr_links]
+        logits = model.predictor(batch_node_features)
+        preds.append(logits.view(-1).cpu())
+    if args.wandb:
+        wandb.log({f"inference_{split}_epoch_time": time.time() - t0})
+    pred = torch.cat(preds)
+    labels = labels[:len(pred)]
+    pos_pred = pred[labels == 1]
+    neg_pred = pred[labels == 0]
+    return pos_pred, neg_pred, pred, labels
 
 
 @torch.no_grad()

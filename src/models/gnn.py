@@ -28,6 +28,7 @@ class GCN(torch.nn.Module):
         self.convs.append(GCNConv(hidden_channels, out_channels, cached=True))
 
         self.dropout = dropout
+        self.predictor = LinkPredictor(hidden_channels, hidden_channels, 1, num_layers, dropout)
 
     def reset_parameters(self):
         for conv in self.convs:
@@ -99,6 +100,7 @@ class SAGE(torch.nn.Module):
         self.convs.append(SAGEConv(hidden_channels, out_channels, root_weight=residual))
 
         self.dropout = dropout
+        self.predictor = LinkPredictor(hidden_channels, hidden_channels, 1, num_layers, dropout)
 
     def reset_parameters(self):
         for conv in self.convs:
@@ -200,9 +202,11 @@ class LinkPredictor(torch.nn.Module):
         super(LinkPredictor, self).__init__()
 
         self.lins = torch.nn.ModuleList()
+        self.bns = torch.nn.ModuleList()
         self.lins.append(torch.nn.Linear(in_channels, hidden_channels))
         for _ in range(num_layers - 2):
             self.lins.append(torch.nn.Linear(hidden_channels, hidden_channels))
+            self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
         self.lins.append(torch.nn.Linear(hidden_channels, out_channels))
 
         self.dropout = dropout
@@ -211,11 +215,18 @@ class LinkPredictor(torch.nn.Module):
         for lin in self.lins:
             lin.reset_parameters()
 
-    def forward(self, x_i, x_j):
-        x = x_i * x_j
-        for lin in self.lins[:-1]:
+    def forward(self, x):
+        """
+        small neural network applied edgewise to hadamard product of node features
+        @param x: node features torch tensor [batch_size, 2, hidden_dim]
+        @return: torch tensor [batch_size, hidden_dim]
+        """
+        x = x[:, 0, :] * x[:, 1, :]
+        for bn, lin in zip(self.bns, self.lins[:-1]):
             x = lin(x)
+            x = bn(x)
             x = F.relu(x)
             x = F.dropout(x, p=self.dropout, training=self.training)
         x = self.lins[-1](x)
-        return torch.sigmoid(x)
+        # there is no sigmoid as this is passed to BCELoss which includes the sigmoid
+        return x

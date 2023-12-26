@@ -5,19 +5,18 @@ constructing the hashed data objects used by elph and buddy
 import os
 from time import time
 
-import networkx as nx
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
 import scipy.sparse as ssp
 import torch
 import torch_sparse
+from torch_sparse import coalesce
 from embiggen.embedders.ensmallen_embedders.hyper_sketching import HyperSketching
 from grape import Graph
-from torch_geometric.data import Dataset, Data
+from torch_geometric.data import Dataset
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
-from torch_geometric.utils import to_networkx, to_undirected
-from torch_sparse import coalesce
+from torch_geometric.utils import to_undirected
 
 from src.hashing import ElphHashes
 from src.heuristics import RA
