@@ -128,7 +128,14 @@ class ELPH(torch.nn.Module):
             self.sign_embedding = SIGNEmbedding(args.hidden_channels, args.hidden_channels, args.hidden_channels,
                                                 args.sign_k, args.sign_dropout)
 
-    def _convolution_builder(self, num_features, hidden_channels, args):
+    def _convolution_builder(self, num_features: int, hidden_channels: int, args) -> None:
+        """
+        Here GCN conv will add self-loops and perform symmetric degree normalisation by default
+        @param num_features: raw features
+        @param hidden_channels:
+        @param args:
+        @return:
+        """
         self.convs = torch.nn.ModuleList()
         if args.feature_prop in {'residual', 'cat'}:  # use a linear encoder
             self.feature_encoder = Linear(num_features, hidden_channels)
