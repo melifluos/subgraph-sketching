@@ -97,8 +97,8 @@ def train_with_rewiring(model, optimizer, train_loader, args, device):
     labels = torch.tensor(data.labels)
     loader = DataLoader(range(len(links)), args.batch_size, shuffle=True)
     for batch_count, indices in enumerate(tqdm(loader)):
-        curr_links = links[indices].to(device)
-        curr_labels = labels[indices].to(device)
+        curr_links = links[indices]
+        curr_labels = labels[indices]
         # get node features
         edge_index, _ = edge_builder.rewire_graph(curr_links, curr_labels, data.edge_index, data.edge_weight)
         node_features = model(data.x.to(device), edge_index.to(device))
