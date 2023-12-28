@@ -6,7 +6,6 @@ from math import isclose
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils.random import barabasi_albert_graph
 from torch_geometric.utils import add_self_loops, to_undirected
-
 import numpy as np
 import scipy.sparse as ssp
 import torch

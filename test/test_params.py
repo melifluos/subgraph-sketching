@@ -23,7 +23,8 @@ OPT = {'sample_size': None, 'dataset_name': 'Cora', 'num_hops': 2, 'max_dist': 1
        'pretrained_node_embedding': False, 'max_z': 1000, 'eval_steps': 1, 'K': 100, 'save_model': False,
        'subgraph_feature_batch_size': 1000000, 'use_grape': False, 'use_grape_exact': False,
        'use_unbiased_feature': False, 'remove_edge_bias': False, 'normalise_grape': False, 'self_loops': False,
-       'remove_bridges': False, 'connected_holdout': False}
+       'remove_bridges': False, 'connected_holdout': False, 'edge_dropout': 0.5, 'remove_target_links': False,
+       'add_negative_links': False, 'drop_message_passing_links': False}
 
 
 def setup_seed(seed):
