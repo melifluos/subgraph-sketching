@@ -19,11 +19,12 @@ from torch_geometric.loader import DataLoader
 
 from src.data import get_data, get_loaders
 from src.evaluation import evaluate_hits, evaluate_mrr
-from src.utils import select_embedding, print_model_params
+from src.utils import select_embedding, print_model_params, str2bool
 from src.wandb_setup import initialise_wandb
 from src.runners.run import set_seed
 from src.runners.train import bce_loss
 from src.runners.inference import test
+from src.graph_rewiring import EdgeBuilder
 
 
 def select_model(args, num_features: int, device: torch.device):
@@ -80,22 +81,12 @@ def get_eval_edges(train, val, test, sample_eval_edges=True):
     return pos_train_edge, neg_train_edge, pos_val_edge, neg_val_edge, pos_test_edge, neg_test_edge
 
 
-def rewire_graph(edge_index: torch.Tensor) -> torch.Tensor:
-    """
-    rewires the input graph. May use various techniques such as
-    1. removing batch supervision edges
-    2. DropEdge
-    3. Adding high probability local edges
-    @return:
-    """
-    return edge_index
-
-
 def train_with_rewiring(model, optimizer, train_loader, args, device):
     """
     A train function that uses a different graph at each batch for convolutions and possibly also structure features
     @return:
     """
+    edge_builder = EdgeBuilder(args)
     print('starting training')
     t0 = time.time()
     model.train()
@@ -106,15 +97,16 @@ def train_with_rewiring(model, optimizer, train_loader, args, device):
     labels = torch.tensor(data.labels)
     loader = DataLoader(range(len(links)), args.batch_size, shuffle=True)
     for batch_count, indices in enumerate(tqdm(loader)):
+        curr_links = links[indices].to(device)
+        curr_labels = labels[indices].to(device)
         # get node features
-        edge_index = rewire_graph(data.edge_index)
+        edge_index, _ = edge_builder.rewire_graph(curr_links, curr_labels, data.edge_index, data.edge_weight)
         node_features = model(data.x.to(device), edge_index.to(device))
         # make edgewise predictions
-        curr_links = links[indices].to(device)
         batch_node_features = None if node_features is None else node_features[curr_links]
         optimizer.zero_grad()
         logits = model.predictor(batch_node_features)
-        loss = bce_loss(logits, labels[indices].squeeze(0).to(device))
+        loss = bce_loss(logits, curr_labels.squeeze(0).to(device))
         loss.backward()
         optimizer.step()
         total_loss += loss.item() * args.batch_size
@@ -164,7 +156,7 @@ def run(args):
                                f'rep{rep}_epoch_time': time.time() - t0, 'epoch_step': epoch}
                     if args.wandb:
                         wandb.log(res_dic)
-                    to_print = f'Epoch: {epoch:02d}, Loss: {loss:.4f}, Train: {100 * train_res:.2f}%, Valid: ' \
+                    to_print = f'Epoch: {epoch:02d}, Best epoch: {best_epoch}, Loss: {loss:.4f}, Train: {100 * train_res:.2f}%, Valid: ' \
                                f'{100 * val_res:.2f}%, Test: {100 * test_res:.2f}%, epoch time: {time.time() - t0:.1f}'
                     print(key)
                     print(to_print)
@@ -215,6 +207,10 @@ if __name__ == '__main__':
     parser.add_argument('--dropout', type=float, default=0.0)
     parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--eval_steps', type=int, default=1)
+    parser.add_argument('--edge_dropout', type=float, default=0)
+    parser.add_argument('--remove_target_links', type=str2bool, default=1)
+    parser.add_argument('--add_negative_links', type=str2bool, default=1)
+    parser.add_argument('--drop_message_passing_links', type=str2bool, default=1)
     # test settings
     parser.add_argument('--K', type=int, default=100, help='the @k to calculate hitrate and ndcg')
     parser.add_argument('--reps', type=int, default=1, help='the number of repetition of the experiment to run')
