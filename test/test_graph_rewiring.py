@@ -33,8 +33,6 @@ class GraphRewiringTests(unittest.TestCase):
         edge_weight = torch.ones(self.edge_index.size(1), dtype=torch.int)
         self.A = ssp.csr_matrix((edge_weight, (self.edge_index[0], self.edge_index[1])),
                                 shape=(self.n_nodes, self.n_nodes))
-
-        self.pos_edges = self.edge_index[:, indices].T
         self.neg_edges = torch.randint(self.n_nodes, (self.n_edges, 2))
         self.links = torch.cat([self.pos_edges, self.neg_edges])
         self.labels = torch.cat([torch.ones(self.n_edges), torch.zeros(self.n_edges)])
